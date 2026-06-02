@@ -135,7 +135,7 @@ app.MapGet("/api/history/{metric}", async (
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
     await db.RecentAnomaliesAsync(Math.Clamp(limit ?? 100, 1, 1000), server, metric, ct));
 
-app.MapGet("/api/alerts", async (MonitorDatabase db, int? limit, CancellationToken ct) =>
-    await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), ct));
+app.MapGet("/api/alerts", async (MonitorDatabase db, int? limit, string? server, CancellationToken ct) =>
+    await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), server, ct));
 
 app.Run();
