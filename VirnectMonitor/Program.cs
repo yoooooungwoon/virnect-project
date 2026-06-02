@@ -106,6 +106,31 @@ app.MapGet("/api/history/{server}/{metric}", async (
     return Results.Ok(new { server, metric, unit = spec.Unit, name = spec.Name, points });
 });
 
+// 한 지표의 "모든 서버" 추이를 한 번에 (대시보드 시계열 그래프용)
+app.MapGet("/api/history/{metric}", async (
+    string metric, int? minutes, int? step,
+    PrometheusClient prom, IConfiguration config, CancellationToken ct) =>
+{
+    if (!Metrics.ById.TryGetValue(metric, out var spec))
+        return Results.NotFound(new { error = "지표 없음", metric });
+
+    var groupLabel = config["Monitor:GroupLabel"] ?? "server";
+    var windowMin = Math.Clamp(minutes ?? 60, 1, 24 * 60);
+    var stepSec = Math.Clamp(step ?? 15, 5, 3600);
+    var end = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    var start = end - windowMin * 60;
+
+    var series = await prom.QueryRangeAsync(spec.Query, start, end, stepSec, ct);
+    var result = series
+        .Select(s => new
+        {
+            server = s.Labels.TryGetValue(groupLabel, out var v) ? v : "unknown",
+            points = s.Points.Select(p => new object[] { p.Ts, p.Value }),
+        })
+        .OrderBy(x => x.server);
+    return Results.Ok(new { metric, unit = spec.Unit, name = spec.Name, series = result });
+});
+
 // --- 이벤트 이력(SQLite) --------------------------------------------
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
     await db.RecentAnomaliesAsync(Math.Clamp(limit ?? 100, 1, 1000), server, metric, ct));
