@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "VirnectMonitor": {
+      "commandName": "Project",
+      "applicationUrl": "http://0.0.0.0:47892",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
