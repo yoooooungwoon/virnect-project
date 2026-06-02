@@ -10,6 +10,7 @@ obj/
 
 # 환경/시크릿
 appsettings.*.local.json
+.env
 
 # 다른 프로젝트(PUBG) 바이블 — 이 레포에 포함하지 않음
 CLAUDE.md

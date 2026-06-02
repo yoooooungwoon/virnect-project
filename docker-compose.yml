@@ -1,0 +1,46 @@
+# 모니터링 백엔드 + Cloudflare 터널 배포 (방식 B: 같은 네트워크 + 서비스명)
+services:
+  virnect-monitor:
+    build:
+      context: ./VirnectMonitor
+      dockerfile: Dockerfile
+    container_name: virnect-monitor
+    environment:
+      # ① Prometheus 주소 — 같은 네트워크의 'prometheus' 컨테이너를 "이름"으로 호출
+      #    (컨테이너 안에서 127.0.0.1은 자기 자신이라 안 되므로 서비스명 사용)
+      - Monitor__PrometheusUrl=http://prometheus:9090
+      # ② 다른 컨테이너(cloudflared)가 들어올 수 있게 0.0.0.0 으로 듣기
+      - ASPNETCORE_URLS=http://0.0.0.0:47892
+      # ③ DB 파일 경로를 볼륨 위치로 (아래 volumes와 짝)
+      - Monitor__DbPath=/data/monitoring.db
+    volumes:
+      # ③ monitoring.db를 named volume에 저장 → 컨테이너 재시작/재배포에도 이상징후 기록 보존
+      - monitor-data:/data
+    networks:
+      - prometheus_default   # Prometheus와 같은 네트워크 (이름으로 접근)
+      - moni-net             # cloudflared와 통신
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      # ④-1 대시보드에서 발급한 터널 토큰 (.env 파일에서 주입, 코드/이미지에 안 박음)
+      #     ④-2 "호스트네임 → http://virnect-monitor:47892" 매핑은 Cloudflare 대시보드 UI에서.
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - moni-net             # 여기서 http://virnect-monitor:47892 로 전달
+    depends_on:
+      - virnect-monitor
+    restart: unless-stopped
+
+networks:
+  # 기존 Prometheus compose가 만들어 둔 네트워크를 그대로 재사용 (새로 안 만듦)
+  prometheus_default:
+    external: true
+  moni-net:
+    driver: bridge
+
+volumes:
+  monitor-data:
