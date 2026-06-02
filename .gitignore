@@ -33,3 +33,7 @@ desktop.ini
 
 # 작업 메모·계획 문서 — 로컬 전용 (프로젝트 코드 아님)
 docs/
+
+# 로컬 실행 편의 / IDE 전용 (배포는 docker compose)
+run-moni-back.cmd
+**/launchSettings.json
