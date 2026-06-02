@@ -1,0 +1,34 @@
+# .NET 빌드 산출물
+bin/
+obj/
+*.user
+
+# SQLite DB
+*.db
+*.db-wal
+*.db-shm
+
+# 환경/시크릿
+appsettings.*.local.json
+
+# 다른 프로젝트(PUBG) 바이블 — 이 레포에 포함하지 않음
+CLAUDE.md
+claude.md
+
+# Claude Code 로컬 설정 (프로젝트 무관)
+.claude/
+
+# IDE / 에디터
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS 생성 파일
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 작업 메모·계획 문서 — 로컬 전용 (프로젝트 코드 아님)
+docs/
