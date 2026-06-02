@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIRNECT 서버 모니터링</title>
+<style>
+  :root{--clean:#2e7d32;--warning:#f9a825;--danger:#c62828;--bg:#0f1117;--card:#1a1d27;--line:#2a2e3a;--mut:#9aa0ac;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:#e6e6e6;}
+  header{padding:14px 22px;background:#13161f;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;}
+  header h1{font-size:17px;margin:0;}
+  #status{font-size:13px;color:var(--mut);}
+  .wrap{padding:18px 22px;display:flex;flex-direction:column;gap:20px;}
+  .servers{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
+  .server{background:var(--card);border-radius:12px;padding:14px;border-top:4px solid #444;}
+  .server.clean{border-top-color:var(--clean);}.server.warning{border-top-color:var(--warning);}.server.danger{border-top-color:var(--danger);}
+  .server h2{font-size:15px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;}
+  .badge{font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;}
+  .badge.clean{background:var(--clean);}.badge.warning{background:var(--warning);}.badge.danger{background:var(--danger);}
+  .metric{margin:8px 0;cursor:pointer;}
+  .metric:hover .name{color:#fff;text-decoration:underline;}
+  .metric .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+  .metric .name{color:var(--mut);}
+  .metric .val.warning{color:var(--warning);}.metric .val.danger{color:var(--danger);}
+  .bar{height:6px;background:#2a2e3a;border-radius:3px;overflow:hidden;}
+  .bar>i{display:block;height:100%;background:var(--clean);transition:width .3s;}
+  .bar>i.warning{background:var(--warning);}.bar>i.danger{background:var(--danger);}
+  .panels{display:grid;grid-template-columns:2fr 1fr;gap:18px;}
+  .panel{background:var(--card);border-radius:12px;padding:16px;}
+  .panel h3{margin:0 0 12px;font-size:15px;}
+  .chart-head{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  select,button{background:#222633;color:#e6e6e6;border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:13px;}
+  canvas{width:100%;height:240px;background:#0c0e14;border-radius:8px;}
+  .alerts{max-height:430px;overflow:auto;}
+  .alert{padding:9px 11px;border-radius:8px;margin-bottom:7px;font-size:13px;background:#222633;border-left:4px solid #555;}
+  .alert.warning{border-left-color:var(--warning);}.alert.danger{border-left-color:var(--danger);}.alert.clean{border-left-color:var(--clean);}
+  .alert .t{color:#888;font-size:11px;margin-top:3px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🖥️ VIRNECT 서버 모니터링</h1>
+  <span id="status">연결 중…</span>
+</header>
+<div class="wrap">
+  <div class="servers" id="servers"></div>
+  <div class="panels">
+    <div class="panel">
+      <h3>📈 시계열 추이 <span style="color:var(--mut);font-size:12px;">(Prometheus)</span></h3>
+      <div class="chart-head">
+        <select id="selServer"></select>
+        <select id="selMetric"></select>
+        <select id="selRange">
+          <option value="15">15분</option>
+          <option value="60" selected>1시간</option>
+          <option value="360">6시간</option>
+          <option value="1440">24시간</option>
+        </select>
+        <button id="btnReload">새로고침</button>
+        <span id="chartInfo" style="color:var(--mut);font-size:12px;"></span>
+      </div>
+      <canvas id="chart" width="800" height="240"></canvas>
+    </div>
+    <div class="panel">
+      <h3>🔔 알림 이력</h3>
+      <div class="alerts" id="alerts"></div>
+    </div>
+  </div>
+</div>
+<script>
+const LV = {clean:"클린", warning:"보통", danger:"위험"};
+const $ = (id) => document.getElementById(id);
+let metricDefs = [];
+
+// --- 현재 상태 카드 (5초 폴링) ---
+async function loadStatus(){
+  try{
+    const r = await fetch("/api/status"); const data = await r.json();
+    renderServers(data.servers || {});
+    $("status").textContent = data.ts ? "● 업데이트 " + new Date(data.ts*1000).toLocaleTimeString("ko-KR") : "● 대기";
+  }catch(e){ $("status").textContent = "○ 연결 실패"; }
+}
+function renderServers(servers){
+  const el = $("servers"); el.innerHTML = "";
+  const names = Object.keys(servers).sort();
+  for(const name of names){
+    const s = servers[name];
+    const metrics = Object.values(s.metrics).map(m=>{
+      const width = m.unit === "%" ? Math.min(100, m.value) : Math.min(100, (m.value/m.danger)*100);
+      return `<div class="metric" data-server="${s.server}" data-metric="${m.id}">
+        <div class="top"><span class="name">${m.name}</span><span class="val ${m.level}">${m.display}</span></div>
+        <div class="bar"><i class="${m.level}" style="width:${width}%"></i></div></div>`;
+    }).join("");
+    el.insertAdjacentHTML("beforeend",
+      `<div class="server ${s.overall}"><h2>${s.server}<span class="badge ${s.overall}">${s.overallText}</span></h2>${metrics}</div>`);
+  }
+  // 지표 클릭 → 해당 그래프 보기
+  el.querySelectorAll(".metric").forEach(m=>m.addEventListener("click",()=>{
+    $("selServer").value = m.dataset.server; $("selMetric").value = m.dataset.metric; loadChart();
+  }));
+  // 셀렉트 채우기(최초 1회)
+  if($("selServer").options.length === 0 && names.length){
+    names.forEach(n=>$("selServer").add(new Option(n,n)));
+    metricDefs.forEach(d=>$("selMetric").add(new Option(d.name, d.id)));
+    loadChart();
+  }
+}
+
+// --- 알림 이력 ---
+async function loadAlerts(){
+  try{
+    const r = await fetch("/api/alerts?limit=40"); const list = await r.json();
+    $("alerts").innerHTML = list.map(a=>{
+      const t = new Date(a.createdAt*1000).toLocaleString("ko-KR");
+      return `<div class="alert ${a.level}">${a.message}<div class="t">${t}</div></div>`;
+    }).join("") || `<div style="color:var(--mut);font-size:13px;">아직 알림이 없습니다.</div>`;
+  }catch(e){}
+}
+
+// --- 시계열 그래프 (Prometheus range query) ---
+async function loadChart(){
+  const server = $("selServer").value, metric = $("selMetric").value, mins = $("selRange").value;
+  if(!server || !metric) return;
+  $("chartInfo").textContent = "불러오는 중…";
+  try{
+    const r = await fetch(`/api/history/${server}/${metric}?minutes=${mins}&step=${mins>360?60:15}`);
+    const data = await r.json();
+    drawChart(data.points || [], data.unit);
+    $("chartInfo").textContent = `${data.name} · ${data.points.length}점`;
+  }catch(e){ $("chartInfo").textContent = "조회 실패"; }
+}
+function drawChart(points, unit){
+  const cv = $("chart"), ctx = cv.getContext("2d");
+  const W = cv.width = cv.clientWidth, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+  if(!points.length){ ctx.fillStyle="#9aa0ac"; ctx.fillText("데이터 없음",W/2-30,H/2); return; }
+  const pad = {l:48,r:12,t:12,b:22};
+  const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  let y0=Math.min(...ys), y1=Math.max(...ys);
+  if(unit==="%"){ y0=0; y1=Math.max(100,y1); } else { const pd=(y1-y0)*0.1||1; y0=Math.max(0,y0-pd); y1+=pd; }
+  const px=(x)=>pad.l+(x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
+  const py=(y)=>H-pad.b-(y-y0)/((y1-y0)||1)*(H-pad.t-pad.b);
+  // grid + y labels
+  ctx.strokeStyle="#2a2e3a"; ctx.fillStyle="#9aa0ac"; ctx.font="11px Segoe UI"; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=y0+(y1-y0)*i/4, yy=py(y);
+    ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(W-pad.r,yy); ctx.stroke();
+    ctx.fillText(unit==="%"?y.toFixed(0):fmtBytes(y), 4, yy+3); }
+  // line
+  ctx.strokeStyle="#4f8cff"; ctx.lineWidth=2; ctx.beginPath();
+  points.forEach((p,i)=>{ const X=px(p[0]),Y=py(p[1]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }); ctx.stroke();
+  // x labels (시작/끝)
+  ctx.fillStyle="#9aa0ac";
+  ctx.fillText(new Date(x0*1000).toLocaleTimeString("ko-KR"), pad.l, H-6);
+  ctx.fillText(new Date(x1*1000).toLocaleTimeString("ko-KR"), W-pad.r-54, H-6);
+}
+function fmtBytes(n){ const u=["","K","M","G"]; let i=0; while(Math.abs(n)>=1024&&i<3){n/=1024;i++;} return n.toFixed(0)+u[i]; }
+
+// --- 시작 ---
+(async()=>{
+  try{ metricDefs = (await (await fetch("/api/metrics")).json()).metrics; }catch(e){}
+  $("btnReload").onclick = loadChart;
+  $("selServer").onchange = $("selMetric").onchange = $("selRange").onchange = loadChart;
+  await loadStatus(); await loadAlerts();
+  setInterval(loadStatus, 5000);
+  setInterval(loadAlerts, 5000);
+})();
+</script>
+</body>
+</html>
