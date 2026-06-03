@@ -59,13 +59,21 @@ CPU 온도, CPU 사용률, RAM, DISK, POWER의 상태 변화를 한 화면에서
 
 ```txt
 design/
-├─ virnect-project.fig
-│  
-├─ 인증 화면.pdf
-├─ 모니터링 화면.pdf
-├─ 그래프.pdf
+│
+├─ README.md
 │ 
-└─ README.md
+├─ figma/
+│  └─ virnect-project.fig
+│  
+├─ pdf/
+│  ├─ 인증 화면.pdf
+│  ├─ 모니터링 화면.pdf
+│  └─ 그래프.pdf 
+│
+└─ png/
+   ├─ 인증 화면.png
+   ├─ 모니터링 화면.png
+   └─ 그래프.png
 ```
 
 ## Figma에서 보기
