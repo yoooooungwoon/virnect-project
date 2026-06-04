@@ -249,6 +249,24 @@ public sealed class AuthService
             Username: session.Username);
     }
 
+    public async Task<bool> HasActiveApprovedSessionAsync()
+    {
+        var now = NowSeconds();
+        var session = await _sessions.GetLatestApprovedAsync();
+        if (session is null)
+        {
+            return false;
+        }
+
+        if (IsExpired(session, now))
+        {
+            await _sessions.MarkExpiredAsync(session.Id, now);
+            return false;
+        }
+
+        return IsAuthenticated(session, now);
+    }
+
     public async Task<IReadOnlyList<AuthSessionView>> ListSessionsAsync(int limit)
     {
         var boundedLimit = Math.Clamp(limit, 1, 100);

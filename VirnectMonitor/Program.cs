@@ -34,18 +34,42 @@ await app.Services.GetRequiredService<LoginAuditRepository>().InitializeAsync();
 await app.Services.GetRequiredService<AuthSessionRepository>().InitializeAsync();
 
 app.UseCors();
+app.Use(async (context, next) =>
+{
+    if (IsDashboardStaticPath(context.Request.Path))
+    {
+        var auth = context.RequestServices.GetRequiredService<AuthService>();
+        if (!await auth.HasActiveApprovedSessionAsync())
+        {
+            context.Response.Redirect("/auth/start");
+            return;
+        }
+    }
+
+    await next();
+});
 app.UseStaticFiles();
 
 app.MapAuthEndpoints();
 
-app.MapGet("/monitoring", (IWebHostEnvironment environment) =>
+app.MapGet("/monitoring", async (IWebHostEnvironment environment, AuthService auth) =>
 {
+    if (!await auth.HasActiveApprovedSessionAsync())
+    {
+        return Results.Redirect("/auth/start");
+    }
+
     var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
     return Results.File(Path.Combine(webRootPath, "index.html"), "text/html");
 });
 
-app.MapGet("/monitoring/server", (IWebHostEnvironment environment) =>
+app.MapGet("/monitoring/server", async (IWebHostEnvironment environment, AuthService auth) =>
 {
+    if (!await auth.HasActiveApprovedSessionAsync())
+    {
+        return Results.Redirect("/auth/start");
+    }
+
     var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
     return Results.File(Path.Combine(webRootPath, "server.html"), "text/html");
 });
@@ -165,3 +189,9 @@ app.MapGet("/api/alerts", async (MonitorDatabase db, int? limit, string? server,
     await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), server, ct));
 
 app.Run();
+
+static bool IsDashboardStaticPath(PathString path)
+{
+    return path.Equals("/index.html", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/server.html", StringComparison.OrdinalIgnoreCase);
+}

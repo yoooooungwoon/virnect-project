@@ -65,11 +65,11 @@ dotnet run --project VirnectMonitor -c Release --urls http://127.0.0.1:47892
 
 - 로그인/회원가입: http://127.0.0.1:47892/
 - 대시보드: http://127.0.0.1:47892/monitoring
-- 서버 상세: http://127.0.0.1:47892/server.html?server=server-01
+- 서버 상세: http://127.0.0.1:47892/monitoring/server?server=server-01
 - 헬스체크: http://127.0.0.1:47892/api/health
 - 포트 변경: `ASPNETCORE_URLS`.
 
-> `/`는 관리자 계정이 없으면 최초 회원가입으로, 계정이 있으면 로그인으로 진입합니다. 그래프 대시보드는 관리자용 버튼에서 `/monitoring`으로 연결하는 기준입니다.
+> `/`는 관리자 계정이 없으면 최초 회원가입으로, 계정이 있으면 로그인으로 진입합니다. 그래프 대시보드는 활성 관리자 세션이 있을 때 `/monitoring`에서 열립니다.
 
 ## API
 
@@ -87,7 +87,7 @@ dotnet run --project VirnectMonitor -c Release --urls http://127.0.0.1:47892
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/monitoring` | 그래프 대시보드 화면 |
-| GET | `/server.html?server=server-01` | 서버 상세 화면 |
+| GET | `/monitoring/server?server=server-01` | 서버 상세 화면 |
 | GET | `/api/status` | 모든 서버 현재 상태 스냅샷 |
 | GET | `/api/server/{server}` | 특정 서버 현재 상태 |
 | GET | `/api/metrics` | 지표 정의/임계치 |

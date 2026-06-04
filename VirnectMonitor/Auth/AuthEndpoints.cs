@@ -736,16 +736,31 @@ public static class AuthEndpoints
 
         app.MapGet("/auth/sessions", async (AuthService auth, int? limit) =>
         {
+            if (!await auth.HasActiveApprovedSessionAsync())
+            {
+                return Results.Unauthorized();
+            }
+
             return Results.Ok(await auth.ListSessionsAsync(limit ?? 20));
         });
 
         app.MapGet("/auth/login-audits", async (AuthService auth, int? limit) =>
         {
+            if (!await auth.HasActiveApprovedSessionAsync())
+            {
+                return Results.Unauthorized();
+            }
+
             return Results.Ok(await auth.ListLoginAuditsAsync(limit ?? 20));
         });
 
         app.MapGet("/monitor", async (AuthService auth) =>
         {
+            if (!await auth.HasActiveApprovedSessionAsync())
+            {
+                return Results.Redirect("/auth/start");
+            }
+
             var sessions = await auth.ListSessionsAsync(20);
             var audits = await auth.ListLoginAuditsAsync(20);
             return Results.Content(RenderMonitorPage(sessions, audits), "text/html; charset=utf-8");
