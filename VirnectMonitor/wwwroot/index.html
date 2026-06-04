@@ -21,23 +21,26 @@
   .server-tabs{display:flex;gap:8px;flex-wrap:wrap}
   .server-tab{border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer}
   .server-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 32px}
-  .metric-card{min-height:178px;background:var(--panel);border:3px solid currentColor;border-radius:26px;padding:22px 26px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 1px 0 rgba(0,0,0,.04)}
-  .metric-card h2{margin:0;font-size:21px;line-height:1;color:currentColor;font-weight:800;letter-spacing:0}
-  .metric-card .value{font-size:38px;font-weight:800;line-height:1.1;color:currentColor}
-  .metric-card .sub{color:var(--muted);font-size:12px;margin-top:7px}
-  .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid currentColor;padding:4px 9px;font-size:12px;font-weight:700}
+  .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
+  .metric-card{min-height:118px;background:var(--panel);border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800;letter-spacing:0}
+  .metric-card .value{font-size:25px;font-weight:800;line-height:1.1;color:#111;white-space:nowrap}
+  .metric-card .value.alert{color:var(--red)}
+  .metric-card .sub{color:var(--muted);font-size:12px;margin-top:4px;text-align:left}
+  .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid #111;color:#111;padding:4px 9px;font-size:12px;font-weight:700}
+  .metric-card .level.alert{border-color:var(--red);color:var(--red)}
   .metric-card.red{color:var(--red)}.metric-card.mint{color:var(--mint)}.metric-card.sky{color:var(--sky)}
   .metric-card.lime{color:var(--lime)}.metric-card.blue{color:var(--blue)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
-  .chart-card{height:194px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px;color:var(--blue)}
+  .chart-card{height:224px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px;color:var(--blue)}
   .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
   .chart-card.red{color:var(--red)}.chart-card.mint{color:var(--mint)}.chart-card.sky{color:var(--sky)}
   .chart-card.lime{color:var(--lime)}.chart-card.blue{color:var(--blue)}
-  canvas{display:block;width:100%;height:128px}
+  canvas{display:block;width:100%;height:158px}
   .empty{color:var(--muted);font-size:14px;padding:30px 0}
   @media (max-width:900px){
-    .metric-grid,.chart-grid{grid-template-columns:1fr}
+    .metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    .chart-grid{grid-template-columns:1fr}
     header,main{padding-left:18px;padding-right:18px}
     h1{font-size:26px}
   }
@@ -75,6 +78,21 @@ const METRICS = [
   {id:"net_recv", label:"네트워크 수신량", color:"blue"},
   {id:"net_sent", label:"네트워크 송신량", color:"sky"}
 ];
+const AXES = {
+  cpu: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  memory: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  disk: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  net_recv: {max:720000, ticks:[0,180000,360000,540000,720000], labels:["0k","180k","360k","540k","720k"]},
+  net_sent: {max:158000, ticks:[0,39000,79000,118000,158000], labels:["0k","39k","79k","118k","158k"]}
+};
+const THRESHOLDS = {
+  cpu: {caution:70, warning:85, danger:95},
+  memory: {caution:75, warning:85, danger:95},
+  disk: {caution:80, warning:90, danger:95},
+  net_recv: {caution:504000, warning:612000, danger:684000},
+  net_sent: {caution:110600, warning:134300, danger:150100}
+};
+const LEVEL_LABELS = {clean:"정상", caution:"주의", warning:"경고", danger:"위험"};
 const $ = (id) => document.getElementById(id);
 let selectedServer = "";
 let lastServers = {};
@@ -92,6 +110,14 @@ function displayMetric(m){
   return m.display || String(m.value);
 }
 function levelText(m){ return m?.levelText || "-"; }
+function levelFor(id, value){
+  const t = THRESHOLDS[id];
+  if(!t || typeof value !== "number") return "clean";
+  if(value >= t.danger) return "danger";
+  if(value >= t.warning) return "warning";
+  if(value >= t.caution) return "caution";
+  return "clean";
+}
 
 async function loadStatus(){
   try{
@@ -121,13 +147,15 @@ function renderCards(){
   if(!server){ $("metricCards").innerHTML = `<div class="empty">표시할 서버 데이터가 없습니다.</div>`; return; }
   $("metricCards").innerHTML = METRICS.map(def => {
     const m = server.metrics?.[def.id];
+    const level = m ? levelFor(def.id, m.value) : "clean";
+    const alertClass = level === "clean" ? "" : " alert";
     return `<article class="metric-card ${def.color}">
       <h2>${def.label}</h2>
       <div>
-        <div class="value">${displayMetric(m)}</div>
+        <div class="value${alertClass}">${displayMetric(m)}</div>
         <div class="sub">${selectedServer}</div>
       </div>
-      <span class="level">${levelText(m)}</span>
+      <span class="level${alertClass}">${m ? LEVEL_LABELS[level] : "-"}</span>
     </article>`;
   }).join("");
 }
@@ -141,19 +169,19 @@ async function loadCharts(){
   await Promise.all(METRICS.map(async def => {
     try{
       const data = await (await fetch(`/api/history/${selectedServer}/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
-      drawLine($(`cv_${def.id}`), data.points || [], def.color, data.unit);
+      drawLine($(`cv_${def.id}`), data.points || [], def.color, def.id);
     }catch(e){
-      drawLine($(`cv_${def.id}`), [], def.color, "%");
+      drawLine($(`cv_${def.id}`), [], def.color, def.id);
     }
   }));
 }
 function colorValue(name){
   return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || "#27349b";
 }
-function drawLine(canvas, points, colorName, unit){
+function drawLine(canvas, points, colorName, metricId){
   const ctx = canvas.getContext("2d");
   const W = canvas.width = canvas.clientWidth;
-  const H = canvas.height = canvas.clientHeight || 128;
+  const H = canvas.height = canvas.clientHeight || 158;
   ctx.clearRect(0,0,W,H);
   if(!points.length){
     ctx.fillStyle = "#9aa0ac";
@@ -161,19 +189,61 @@ function drawLine(canvas, points, colorName, unit){
     ctx.fillText("데이터 없음", 12, H/2);
     return;
   }
-  const pad = {l:2,r:2,t:10,b:10};
+  const axis = AXES[metricId];
+  const pad = {l:42,r:8,t:8,b:24};
   const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const yMax = unit === "%" ? Math.max(100, Math.max(...ys)) : Math.max(...ys) * 1.15 || 1;
+  const yMax = axis.max;
   const px = x => pad.l + (x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
   const py = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
-  ctx.strokeStyle = colorValue(colorName);
+  ctx.font = "11px Segoe UI";
+  ctx.lineWidth = 1;
+  ctx.textBaseline = "middle";
+  axis.ticks.forEach((tickValue, i) => {
+    const y = py(tickValue);
+    ctx.strokeStyle = "#e6e8ef";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+    ctx.fillStyle = "#7f8797";
+    ctx.textAlign = "right";
+    ctx.fillText(axis.labels[i], pad.l-7, y);
+  });
+  Object.values(THRESHOLDS[metricId]).forEach(threshold => {
+    const y = py(threshold);
+    ctx.strokeStyle = "rgba(255,57,40,.32)";
+    ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  const timeLabels = [points[0], points[Math.floor(points.length/2)], points[points.length-1]];
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#7f8797";
+  timeLabels.forEach((point, i) => {
+    ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
+    ctx.fillText(new Date(point[0]*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(point[0]), H-17);
+  });
+  ctx.strokeStyle = "#111";
   ctx.lineWidth = 5;
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";
   ctx.beginPath();
   points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
   ctx.stroke();
+  ctx.strokeStyle = "#ff3928";
+  ctx.lineWidth = 5;
+  for(let i=1;i<points.length;i++){
+    if(points[i-1][1] >= THRESHOLDS[metricId].caution || points[i][1] >= THRESHOLDS[metricId].caution){
+      ctx.beginPath();
+      ctx.moveTo(px(points[i-1][0]), py(points[i-1][1]));
+      ctx.lineTo(px(points[i][0]), py(points[i][1]));
+      ctx.stroke();
+    }
+  }
 }
 
 (async()=>{
