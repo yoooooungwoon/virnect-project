@@ -1,5 +1,6 @@
 // 모니터링 백엔드 진입점 — 수집기 등록 + Make&View/웹 프론트용 GET API 구성
 using VirnectMonitor.Models;
+using VirnectMonitor.Auth;
 using VirnectMonitor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,15 @@ builder.Services.AddSingleton<PrometheusClient>();
 builder.Services.AddSingleton<MonitorStore>();
 builder.Services.AddSingleton<MonitorDatabase>();
 builder.Services.AddHostedService<CollectorService>();
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<PasswordHasher>();
+builder.Services.AddSingleton<AuthSessionRepository>();
+builder.Services.AddSingleton<UserRepository>();
+builder.Services.AddSingleton<LoginAuditRepository>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddHostedService<AuthSessionCleanupService>();
 
 // AR/웹 프론트가 다른 출처에서 GET 호출할 수 있게 CORS 허용
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
@@ -19,10 +29,26 @@ var app = builder.Build();
 
 // DB 초기화(테이블 생성)
 await app.Services.GetRequiredService<MonitorDatabase>().InitializeAsync();
+await app.Services.GetRequiredService<UserRepository>().InitializeAsync();
+await app.Services.GetRequiredService<LoginAuditRepository>().InitializeAsync();
+await app.Services.GetRequiredService<AuthSessionRepository>().InitializeAsync();
 
 app.UseCors();
-app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.MapAuthEndpoints();
+
+app.MapGet("/monitoring", (IWebHostEnvironment environment) =>
+{
+    var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+    return Results.File(Path.Combine(webRootPath, "index.html"), "text/html");
+});
+
+app.MapGet("/monitoring/server", (IWebHostEnvironment environment) =>
+{
+    var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+    return Results.File(Path.Combine(webRootPath, "server.html"), "text/html");
+});
 
 // --- 상태/헬스 -------------------------------------------------------
 app.MapGet("/api/health", (MonitorStore store, IConfiguration config) => new

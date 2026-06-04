@@ -1,11 +1,28 @@
-# virnect-project — 서버 모니터링 백엔드 (moni-back)
+# virnect-project — 통합 백엔드 (backEnd)
 
 Prometheus(windows_exporter)가 수집한 **서버 4대**(server-01~04)의 지표를 **5초마다** 가져와
 **클린 / 보통 / 위험** 3단계로 분류하고, 이상징후를 DB에 기록하며,
-**Make&View(AR)** 와 **웹 대시보드** 두 소비자에게 JSON을 제공하는 C# / ASP.NET Core(.NET 10) 백엔드입니다.
+**Make&View(AR)**, **관리자 로그인**, **웹 대시보드**를 함께 담당하는 C# / ASP.NET Core(.NET 10) 통합 백엔드입니다.
 
-> 로그인 브랜치(`VirnectLoginPoc`)는 **참고만** 했고 코드를 가져오거나 수정하지 않았습니다.
-> 로그인한 사용자 = 모니터링 열람 관리자로 보고, **모니터링 앱 자체에는 별도 인증이 없습니다**(진입 차단은 로그인 씬이 담당).
+## 통합 기준
+
+이 브랜치는 실제 외부 IP 동작을 확인한 `moni-back`을 운영 기준으로 삼습니다.
+
+```text
+base: moni-back
+auth source: login/src/VirnectLoginV2/Auth
+graph UI source: moni-back-graph/VirnectMonitor/wwwroot
+target branch: backEnd
+```
+
+통합 정책:
+
+```text
+- 모니터링 수집/Prometheus/Docker/외부 접속 구조는 moni-back 기준 유지
+- 로그인/회원가입/세션/감사 로그는 login V2 Auth 모듈 이식
+- 그래프 대시보드 UI는 moni-back-graph의 wwwroot 파일 이식
+- Monitor DB와 Auth DB는 1차 통합에서 분리 운영
+```
 
 ## 구조 (두 소비자, 역할 분리)
 
@@ -17,12 +34,12 @@ windows_exporter ×4 ─5s→ Prometheus :9090
    │  분류(클린/보통/위험)                                            │
    │   ├─→ MonitorStore (메모리): 현재 상태 1벌 + 직전 레벨           │
    │   └─→ SQLite: 이상징후/알림 "이벤트" 기록                        │
-   │  GET API ──────────────────────────────────────────────────────│
+   │  Auth + GET API ───────────────────────────────────────────────│
    └─────────┬───────────────────────────────┬──────────────────────┘
    현재값/심각도(단일 value)            현재상태 + 시계열(Prometheus) + 이벤트
              ▼                                 ▼
       Make&View (AR)                    웹 대시보드 (브라우저)
-   고정 URL GET, value 읽음          현재 카드 + 추이 그래프 + 알림 로그
+   로그인/고정 URL GET, value 읽음    관리자 로그인 + 현재 카드 + 추이 그래프 + 알림 로그
 ```
 
 - **현재값** = MonitorStore(메모리). **시계열 그래프** = Prometheus range query. **사건 기록** = SQLite.
@@ -43,22 +60,34 @@ windows_exporter ×4 ─5s→ Prometheus :9090
 ## 실행
 
 ```powershell
-# 방법 1: 배치 파일
-run-moni-back.cmd
-
-# 방법 2: 직접
-dotnet run --project VirnectMonitor -c Release
+dotnet run --project VirnectMonitor -c Release --urls http://127.0.0.1:47892
 ```
 
-- 대시보드: http://127.0.0.1:47892/
+- 로그인/회원가입: http://127.0.0.1:47892/
+- 대시보드: http://127.0.0.1:47892/monitoring
+- 서버 상세: http://127.0.0.1:47892/server.html?server=server-01
 - 헬스체크: http://127.0.0.1:47892/api/health
-- 포트 변경: `run-moni-back.cmd`의 `MONI_PORT` 또는 `ASPNETCORE_URLS`.
+- 포트 변경: `ASPNETCORE_URLS`.
+
+> `/`는 관리자 계정이 없으면 최초 회원가입으로, 계정이 있으면 로그인으로 진입합니다. 그래프 대시보드는 관리자용 버튼에서 `/monitoring`으로 연결하는 기준입니다.
 
 ## API
+
+### 관리자 인증용
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/` | 로그인/회원가입 진입 |
+| GET | `/setup` | 최초 관리자 회원가입 화면 |
+| POST | `/setup` | 최초 관리자 저장 |
+| GET | `/login` | 관리자 로그인 화면 |
+| POST | `/auth/login` | 관리자 로그인 처리 |
+| GET | `/auth/current-once` | Make&View 로그인 유지 확인 |
 
 ### 웹 대시보드용
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
+| GET | `/monitoring` | 그래프 대시보드 화면 |
+| GET | `/server.html?server=server-01` | 서버 상세 화면 |
 | GET | `/api/status` | 모든 서버 현재 상태 스냅샷 |
 | GET | `/api/server/{server}` | 특정 서버 현재 상태 |
 | GET | `/api/metrics` | 지표 정의/임계치 |
@@ -86,6 +115,10 @@ dotnet run --project VirnectMonitor -c Release
 | `Monitor:IntervalSeconds` | `5` | 수집 주기(초) |
 | `Monitor:DbPath` | `monitoring.db` | SQLite 파일 |
 | `Monitor:GroupLabel` | `server` | 서버 구분 라벨 |
+| `Auth:PublicBaseUrl` | 빈 값 | 비워두면 요청 Host 기준으로 로그인 URL 생성 |
+| `Auth:DatabasePath` | `Data/auth.db` | 관리자/세션/감사 로그 SQLite 파일 |
+| `Auth:ServerSecret` | `development-only-change-me` | 토큰 해시용 비밀값, 운영에서는 환경변수로 변경 |
+| `Auth:AuthDurationMinutes` | `5` | 로그인 승인 유지 시간 |
 
 ## 산출물 문서
 - 계획/체크리스트/결정 근거: `docs/projects/moni-back/`

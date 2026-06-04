@@ -3,151 +3,239 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>서버 모니터링</title>
+<title>서버 시스템 모니터</title>
 <style>
-  :root{--clean:#2e7d32;--warning:#f9a825;--danger:#c62828;--bg:#0f1117;--card:#1a1d27;--line:#2a2e3a;--mut:#9aa0ac;--accent:#4f8cff;}
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:#e6e6e6;}
-  header{padding:14px 22px;background:#13161f;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
-  header h1{font-size:18px;margin:0;}
-  header .badge{font-size:12px;padding:3px 10px;border-radius:10px;color:#fff;}
-  .badge.clean{background:var(--clean);}.badge.warning{background:var(--warning);}.badge.danger{background:var(--danger);}
-  #status{font-size:13px;color:var(--mut);}
-  a.back{color:var(--accent);text-decoration:none;font-size:13px;}
-  .wrap{padding:18px 22px;display:flex;flex-direction:column;gap:18px;}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;}
-  .panel h3{margin:0 0 12px;font-size:15px;}
-  .alerts{max-height:220px;overflow:auto;}
-  .alert{padding:9px 11px;border-radius:8px;margin-bottom:7px;font-size:13px;background:#222633;border-left:4px solid #555;}
-  .alert.warning{border-left-color:var(--warning);}.alert.danger{border-left-color:var(--danger);}.alert.clean{border-left-color:var(--clean);}
-  .alert .t{color:#888;font-size:11px;margin-top:3px;}
-  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
-  .tile{background:#222633;border-radius:10px;padding:12px 14px;border-top:3px solid #444;}
-  .tile.clean{border-top-color:var(--clean);}.tile.warning{border-top-color:var(--warning);}.tile.danger{border-top-color:var(--danger);}
-  .tile .n{color:var(--mut);font-size:12px;}
-  .tile .v{font-size:22px;font-weight:700;margin-top:4px;}
-  .tile .v.warning{color:var(--warning);}.tile .v.danger{color:var(--danger);}
-  .controls{display:flex;gap:12px;align-items:center;}
-  select{background:#222633;color:#e6e6e6;border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:13px;}
-  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;}
-  .chart-card{background:#222633;border-radius:10px;padding:12px;}
-  .chart-card h4{margin:0 0 6px;font-size:13px;display:flex;justify-content:space-between;}
-  .chart-card h4 .u{color:var(--mut);font-weight:normal;}
-  canvas{width:100%;height:180px;background:#0c0e14;border-radius:8px;}
+  :root{
+    --blue:#27349b;--red:#ff3928;--mint:#b7d7ce;--sky:#79aeca;--lime:#bfd458;
+    --ink:#18203a;--muted:#7f8797;--page:#f7f8fb;--panel:#fff;--line:#e6e8ef;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Malgun Gothic",sans-serif;background:var(--page);color:var(--ink)}
+  header{max-width:1100px;margin:0 auto;padding:24px 28px 6px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  h1{margin:0;color:var(--blue);font-size:30px;line-height:1.1;font-weight:800}
+  #status{color:var(--muted);font-size:13px;margin-bottom:2px}
+  a{color:var(--blue);font-size:13px;font-weight:700;text-decoration:none;margin-bottom:2px}
+  main{max-width:1100px;margin:0 auto;padding:20px 28px 34px;display:flex;flex-direction:column;gap:28px}
+  .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .section-title{margin:0;color:var(--blue);font-size:18px;font-weight:800}
+  select{height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:0 10px;font-size:13px}
+  .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
+  .metric-card{min-height:118px;background:var(--panel);border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+  .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800}
+  .metric-card .value{font-size:25px;font-weight:800;line-height:1.1;color:#111;white-space:nowrap}
+  .metric-card .value.alert{color:var(--red)}
+  .metric-card .sub{color:var(--muted);font-size:12px;margin-top:4px;text-align:left}
+  .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid #111;color:#111;padding:4px 9px;font-size:12px;font-weight:700}
+  .metric-card .level.alert{border-color:var(--red);color:var(--red)}
+  .red{color:var(--red)}.mint{color:var(--mint)}.sky{color:var(--sky)}.lime{color:var(--lime)}.blue{color:var(--blue)}
+  .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
+  .chart-card{height:224px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px}
+  .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
+  canvas{display:block;width:100%;height:158px}
+  .empty{color:var(--muted);font-size:14px;padding:30px 0}
+  @media (max-width:900px){
+    .metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    .chart-grid{grid-template-columns:1fr}
+    header,main{padding-left:18px;padding-right:18px}
+    h1{font-size:26px}
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1 id="title">서버</h1>
-  <span class="badge clean" id="overall">-</span>
-  <span id="status"></span>
-  <a class="back" href="/">← 전체 통합 보기</a>
+  <h1 id="title">시스템 모니터</h1>
+  <span id="status">연결 대기 중</span>
+  <a href="/">전체 보기</a>
 </header>
-<div class="wrap">
-  <!-- 알림 (맨 위) -->
-  <div class="panel">
-    <h3>🔔 알림 이력</h3>
-    <div class="alerts" id="alerts"></div>
+<main>
+  <div class="toolbar">
+    <h2 class="section-title">실시간 수치</h2>
   </div>
+  <section class="metric-grid" id="metricCards"></section>
 
-  <!-- 현재 상태 -->
-  <div class="panel">
-    <h3>현재 상태</h3>
-    <div class="tiles" id="tiles"></div>
+  <div class="toolbar">
+    <h2 class="section-title">실시간 그래프</h2>
+    <select id="selRange" aria-label="그래프 기간">
+      <option value="5">5분</option>
+      <option value="15">15분</option>
+      <option value="60" selected>1시간</option>
+      <option value="360">6시간</option>
+      <option value="1440">24시간</option>
+    </select>
   </div>
-
-  <!-- 시계열 -->
-  <div class="panel">
-    <h3 style="display:flex;justify-content:space-between;align-items:center;">
-      <span>📈 시계열 추이</span>
-      <span class="controls">
-        <select id="selRange">
-          <option value="5">5분</option>
-          <option value="15">15분</option>
-          <option value="60" selected>1시간</option>
-          <option value="360">6시간</option>
-          <option value="1440">24시간</option>
-        </select>
-      </span>
-    </h3>
-    <div class="charts" id="charts"></div>
-  </div>
-</div>
+  <section class="chart-grid" id="charts"></section>
+</main>
 <script>
 const server = new URLSearchParams(location.search).get("server") || "server-01";
+const METRICS = [
+  {id:"cpu", label:"CPU 사용률", color:"red"},
+  {id:"memory", label:"메모리 사용률", color:"mint"},
+  {id:"disk", label:"디스크 사용률(C:)", color:"lime"},
+  {id:"net_recv", label:"네트워크 수신량", color:"blue"},
+  {id:"net_sent", label:"네트워크 송신량", color:"sky"}
+];
+const AXES = {
+  cpu: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  memory: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  disk: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  net_recv: {max:720000, ticks:[0,180000,360000,540000,720000], labels:["0k","180k","360k","540k","720k"]},
+  net_sent: {max:158000, ticks:[0,39000,79000,118000,158000], labels:["0k","39k","79k","118k","158k"]}
+};
+const THRESHOLDS = {
+  cpu: {caution:70, warning:85, danger:95},
+  memory: {caution:75, warning:85, danger:95},
+  disk: {caution:80, warning:90, danger:95},
+  net_recv: {caution:504000, warning:612000, danger:684000},
+  net_sent: {caution:110600, warning:134300, danger:150100}
+};
+const LEVEL_LABELS = {clean:"정상", caution:"주의", warning:"경고", danger:"위험"};
 const $ = (id) => document.getElementById(id);
-let metricDefs = [];
-document.title = server + " 모니터링";
-$("title").textContent = "🖥️ " + server;
+document.title = `${server} 시스템 모니터`;
+$("title").textContent = `${server} 시스템 모니터`;
 
+function stepFor(min){ return min<=5?10 : min<=15?15 : min<=60?30 : min<=360?120 : 600; }
+function fmtBytes(n){
+  const units=["B/s","KB/s","MB/s","GB/s"]; let i=0;
+  while(Math.abs(n)>=1024 && i<units.length-1){ n/=1024; i++; }
+  return `${n.toFixed(1)} ${units[i]}`;
+}
+function displayMetric(m){
+  if(!m) return "-";
+  if(m.unit === "B/s") return fmtBytes(m.value);
+  if(m.unit === "%") return `${m.value.toFixed(1)}%`;
+  return m.display || String(m.value);
+}
+function levelFor(id, value){
+  const t = THRESHOLDS[id];
+  if(!t || typeof value !== "number") return "clean";
+  if(value >= t.danger) return "danger";
+  if(value >= t.warning) return "warning";
+  if(value >= t.caution) return "caution";
+  return "clean";
+}
+function renderCards(snapshot){
+  $("metricCards").innerHTML = METRICS.map(def => {
+    const m = snapshot.metrics?.[def.id];
+    const level = m ? levelFor(def.id, m.value) : "clean";
+    const alertClass = level === "clean" ? "" : " alert";
+    return `<article class="metric-card ${def.color}">
+      <h2>${def.label}</h2>
+      <div>
+        <div class="value${alertClass}">${displayMetric(m)}</div>
+        <div class="sub">${server}</div>
+      </div>
+      <span class="level${alertClass}">${m ? LEVEL_LABELS[level] : "-"}</span>
+    </article>`;
+  }).join("");
+}
 async function loadStatus(){
   try{
     const s = await (await fetch(`/api/server/${server}`)).json();
-    if(s.error){ $("status").textContent = "○ 서버 없음"; return; }
-    $("overall").className = "badge " + s.overall;
-    $("overall").textContent = s.overallText;
-    $("status").textContent = "● 업데이트 " + new Date(s.updatedAt*1000).toLocaleTimeString("ko-KR");
-    $("tiles").innerHTML = Object.values(s.metrics).map(m =>
-      `<div class="tile ${m.level}"><div class="n">${m.name}</div><div class="v ${m.level}">${m.display}</div></div>`).join("");
-  }catch(e){ $("status").textContent = "○ 연결 실패"; }
+    if(s.error){
+      $("metricCards").innerHTML = `<div class="empty">서버 데이터를 찾을 수 없습니다.</div>`;
+      $("status").textContent = "서버 없음";
+      return;
+    }
+    $("status").textContent = `업데이트 ${new Date(s.updatedAt*1000).toLocaleTimeString("ko-KR")}`;
+    renderCards(s);
+  }catch(e){
+    $("status").textContent = "연결 실패";
+  }
 }
-
-async function loadAlerts(){
-  try{
-    const list = await (await fetch(`/api/alerts?server=${server}&limit=40`)).json();
-    $("alerts").innerHTML = list.map(a=>{
-      const t = new Date(a.createdAt*1000).toLocaleString("ko-KR");
-      return `<div class="alert ${a.level}">${a.message}<div class="t">${t}</div></div>`;
-    }).join("") || `<div style="color:var(--mut);font-size:13px;">이 서버의 알림이 없습니다.</div>`;
-  }catch(e){}
+function buildCharts(){
+  $("charts").innerHTML = METRICS.map(def =>
+    `<article class="chart-card ${def.color}"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
 }
-
-function buildCards(){
-  $("charts").innerHTML = metricDefs.map(d =>
-    `<div class="chart-card"><h4>${d.name}<span class="u">${d.unit}</span></h4><canvas id="cv_${d.id}"></canvas></div>`).join("");
-}
-function stepFor(min){ return min<=5?10 : min<=15?15 : min<=60?30 : min<=360?120 : 600; }
-
 async function loadCharts(){
   const min = parseInt($("selRange").value, 10);
-  await Promise.all(metricDefs.map(async d=>{
+  await Promise.all(METRICS.map(async def => {
     try{
-      const data = await (await fetch(`/api/history/${server}/${d.id}?minutes=${min}&step=${stepFor(min)}`)).json();
-      drawChart($(`cv_${d.id}`), data.points || [], data.unit);
-    }catch(e){}
+      const data = await (await fetch(`/api/history/${server}/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
+      drawLine($(`cv_${def.id}`), data.points || [], def.color, def.id);
+    }catch(e){
+      drawLine($(`cv_${def.id}`), [], def.color, def.id);
+    }
   }));
 }
-function fmtBytes(n){ const u=["","K","M","G"]; let i=0; while(Math.abs(n)>=1024&&i<3){n/=1024;i++;} return n.toFixed(0)+u[i]; }
-function drawChart(cv, points, unit){
-  const ctx = cv.getContext("2d");
-  const W = cv.width = cv.clientWidth, H = cv.height = 180;
+function colorValue(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || "#27349b";
+}
+function drawLine(canvas, points, colorName, metricId){
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width = canvas.clientWidth;
+  const H = canvas.height = canvas.clientHeight || 158;
   ctx.clearRect(0,0,W,H);
-  if(!points.length){ ctx.fillStyle="#9aa0ac"; ctx.font="12px Segoe UI"; ctx.fillText("데이터 없음", W/2-32, H/2); return; }
-  const pad={l:46,r:10,t:10,b:20};
-  const xs=points.map(p=>p[0]), ys=points.map(p=>p[1]);
-  const x0=Math.min(...xs), x1=Math.max(...xs);
-  let y0=0, y1 = unit==="%" ? Math.max(100,Math.max(...ys)) : (Math.max(...ys)*1.15 || 1);
-  const px=x=>pad.l+(x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
-  const py=y=>H-pad.b-(y-y0)/((y1-y0)||1)*(H-pad.t-pad.b);
-  ctx.strokeStyle="#2a2e3a"; ctx.fillStyle="#9aa0ac"; ctx.font="11px Segoe UI"; ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){ const y=y0+(y1-y0)*i/4, yy=py(y);
-    ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(W-pad.r,yy); ctx.stroke();
-    ctx.fillText(unit==="%"?y.toFixed(0):fmtBytes(y), 4, yy+3); }
-  ctx.fillText(new Date(x0*1000).toLocaleTimeString("ko-KR"), pad.l, H-5);
-  ctx.fillText(new Date(x1*1000).toLocaleTimeString("ko-KR"), W-pad.r-52, H-5);
-  ctx.strokeStyle="#4f8cff"; ctx.lineWidth=2; ctx.beginPath();
-  points.forEach((p,i)=>{ const X=px(p[0]),Y=py(p[1]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }); ctx.stroke();
+  if(!points.length){
+    ctx.fillStyle = "#9aa0ac";
+    ctx.font = "13px Segoe UI";
+    ctx.fillText("데이터 없음", 12, H/2);
+    return;
+  }
+  const axis = AXES[metricId];
+  const pad = {l:42,r:8,t:8,b:24};
+  const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const yMax = axis.max;
+  const px = x => pad.l + (x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
+  const py = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
+  ctx.font = "11px Segoe UI";
+  ctx.lineWidth = 1;
+  ctx.textBaseline = "middle";
+  axis.ticks.forEach((tickValue, i) => {
+    const y = py(tickValue);
+    ctx.strokeStyle = "#e6e8ef";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+    ctx.fillStyle = "#7f8797";
+    ctx.textAlign = "right";
+    ctx.fillText(axis.labels[i], pad.l-7, y);
+  });
+  Object.values(THRESHOLDS[metricId]).forEach(threshold => {
+    const y = py(threshold);
+    ctx.strokeStyle = "rgba(255,57,40,.32)";
+    ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  const timeLabels = [points[0], points[Math.floor(points.length/2)], points[points.length-1]];
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#7f8797";
+  timeLabels.forEach((point, i) => {
+    ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
+    ctx.fillText(new Date(point[0]*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(point[0]), H-17);
+  });
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 5;
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+  ctx.stroke();
+  ctx.strokeStyle = "#ff3928";
+  ctx.lineWidth = 5;
+  for(let i=1;i<points.length;i++){
+    if(points[i-1][1] >= THRESHOLDS[metricId].caution || points[i][1] >= THRESHOLDS[metricId].caution){
+      ctx.beginPath();
+      ctx.moveTo(px(points[i-1][0]), py(points[i-1][1]));
+      ctx.lineTo(px(points[i][0]), py(points[i][1]));
+      ctx.stroke();
+    }
+  }
 }
 
 (async()=>{
-  try{ metricDefs = (await (await fetch("/api/metrics")).json()).metrics; }catch(e){}
-  buildCards();
+  buildCharts();
   $("selRange").onchange = loadCharts;
-  await loadStatus(); await loadAlerts(); await loadCharts();
+  await loadStatus();
+  await loadCharts();
   setInterval(loadStatus, 5000);
-  setInterval(loadAlerts, 5000);
   setInterval(loadCharts, 30000);
-  window.addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(loadCharts,300); });
+  window.addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(loadCharts,250); });
 })();
 </script>
 </body>

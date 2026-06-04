@@ -13,6 +13,9 @@ services:
       - ASPNETCORE_URLS=http://0.0.0.0:47892
       # ③ DB 파일 경로를 볼륨 위치로 (아래 volumes와 짝)
       - Monitor__DbPath=/data/monitoring.db
+      - Auth__PublicBaseUrl=${AUTH_PUBLIC_BASE_URL:-}
+      - Auth__DatabasePath=/data/auth.db
+      - Auth__ServerSecret=${AUTH_SERVER_SECRET:-development-only-change-me}
     volumes:
       # ③ monitoring.db를 named volume에 저장 → 컨테이너 재시작/재배포에도 이상징후 기록 보존
       - monitor-data:/data
