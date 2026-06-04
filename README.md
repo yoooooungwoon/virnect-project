@@ -107,6 +107,186 @@ dotnet run --project VirnectMonitor -c Release --urls http://127.0.0.1:47892
 2. 데이터 연결 → 서버 응답 필터 `value`.
 3. 이벤트 → 트리거 `Receive`, 조건 `{값}>=2`, 액션 `씬 이동`(위험 알림 씬).
 
+### Make&View JSON/URL 사용법
+
+기본 요청 형식:
+
+```text
+Method: GET
+Headers: 없음
+Body: 없음
+Response type: JSON
+```
+
+Base URL은 실행 환경에 맞게 하나를 사용합니다.
+
+```text
+로컬 테스트: http://127.0.0.1:47892
+외부/터널 테스트: https://<외부-도메인>
+운영 예시: https://<운영-도메인>
+```
+
+#### 로그인 유지 확인
+
+```text
+GET /auth/current-once
+```
+
+전체 URL 예시:
+
+```text
+https://<외부-도메인>/auth/current-once
+```
+
+응답 예시:
+
+```json
+{
+  "status": "approved",
+  "value": 1,
+  "approved": true,
+  "authenticated": true,
+  "authExpiresAt": "2026-06-04T20:35:40+09:00",
+  "username": "admin"
+}
+```
+
+Make&View에서 읽을 값:
+
+```text
+필터: value
+value = 1  로그인 유지 중
+value = 0  로그인 없음 / 만료 / 해제됨
+```
+
+#### 장비현황
+
+전체 장비현황:
+
+```text
+GET /api/status
+```
+
+서버 1대 장비현황:
+
+```text
+GET /api/server/server-01
+GET /api/server/server-02
+GET /api/server/server-03
+GET /api/server/server-04
+```
+
+서버 1대 응답 예시:
+
+```json
+{
+  "server": "server-01",
+  "metrics": {
+    "cpu": {
+      "value": 53.6,
+      "display": "53.6%",
+      "levelCode": 0,
+      "levelText": "클린"
+    },
+    "memory": {
+      "value": 61.2,
+      "display": "61.2%",
+      "levelCode": 0,
+      "levelText": "클린"
+    },
+    "disk": {
+      "value": 72.4,
+      "display": "72.4%",
+      "levelCode": 1,
+      "levelText": "보통"
+    }
+  },
+  "overallCode": 1,
+  "overallText": "보통"
+}
+```
+
+Make&View에서 장비 전체 상태만 조건으로 쓰려면 `overallCode`를 읽습니다.
+
+```text
+overallCode = 0  클린
+overallCode = 1  보통
+overallCode = 2  위험
+```
+
+#### 위험도만 간단히 받기
+
+전체 장비 중 최악 위험도:
+
+```text
+GET /api/alert
+필터: value
+```
+
+서버 1대 위험도:
+
+```text
+GET /api/alert/server-01
+필터: value
+```
+
+응답 예시:
+
+```json
+{
+  "server": "server-01",
+  "value": 2,
+  "level": "danger",
+  "levelText": "위험"
+}
+```
+
+Make&View 조건 예시:
+
+```text
+{값} >= 2  위험 씬 이동
+{값} == 1  보통/주의 표시
+{값} == 0  정상 표시
+```
+
+#### 특정 지표 1개 받기
+
+`/api/metric/server-01`처럼 서버만 넣는 주소는 사용하지 않습니다. 지표 ID까지 넣어야 합니다.
+
+```text
+GET /api/metric/server-01/cpu
+GET /api/metric/server-01/memory
+GET /api/metric/server-01/disk
+GET /api/metric/server-01/net_recv
+GET /api/metric/server-01/net_sent
+```
+
+응답 예시:
+
+```json
+{
+  "server": "server-01",
+  "metric": "cpu",
+  "name": "CPU 사용률",
+  "value": 53.6,
+  "display": "53.6%",
+  "level": "clean",
+  "levelCode": 0,
+  "levelText": "클린",
+  "unit": "%"
+}
+```
+
+Make&View에서 읽을 값:
+
+```text
+수치 표시: value
+문자 표시: display
+위험도 조건: levelCode
+```
+
+> Prometheus가 연결되지 않았거나 아직 수집 데이터가 없으면 `/api/status`의 `servers`가 비어 있고, `/api/server/server-01` 또는 `/api/metric/server-01/cpu`가 404를 반환할 수 있습니다. 이 경우 먼저 `/api/health`에서 `prometheusUrl`과 `lastError`를 확인합니다.
+
 ## 설정 (`VirnectMonitor/appsettings.json`)
 
 | 키 | 기본값 | 설명 |
