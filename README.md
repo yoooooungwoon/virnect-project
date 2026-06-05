@@ -78,7 +78,7 @@ design/
 └─ make/
    ├─ UI 테스트.mars
    └─png/
-      └─ 메이크 파일에 사용된 png 이미지(총 20개)
+      └─ make 파일에 사용된 png 이미지(총 20개)
 ```
 
 ## Figma에서 보기
