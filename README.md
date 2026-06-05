@@ -83,11 +83,10 @@ design/
 
 ## Figma에서 보기
 
-Figma 링크: [url 첨부]
+Figma 링크: [https://www.figma.com/design/xDIbtgav1PsbP5xpfNDMSL/UI?node-id=0-1&m=dev&t=sdhioHfzbbSYMkrd-1]
 
 ## 작업 목적
 
 이 프로젝트는 시스템 모니터링 UI의 기본 화면 구조와 시각적 스타일을 제안하기 위한 디자인 결과물입니다.
 사용자 인증 이후 시스템 상태를 직관적으로 확인할 수 있도록, 카드 기반 레이아웃과 색상별 지표 구분을 적용했습니다.
 
-# figma 에서  보기 : https://www.figma.com/design/xDIbtgav1PsbP5xpfNDMSL/UI?node-id=0-1&m=dev&t=sdhioHfzbbSYMkrd-1
