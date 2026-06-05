@@ -66,7 +66,10 @@
   <section class="chart-grid" id="charts"></section>
 </main>
 <script>
-const server = new URLSearchParams(location.search).get("server") || "server-01";
+// 서버명 우선순위: ?server= → 경로(/server-01) → 기본값
+const server = new URLSearchParams(location.search).get("server")
+  || (location.pathname.match(/server-\d+/) || [])[0]
+  || "server-01";
 const METRICS = [
   {id:"cpu", label:"CPU 사용률", color:"red"},
   {id:"memory", label:"메모리 사용률", color:"mint"},

@@ -754,7 +754,7 @@ public static class AuthEndpoints
             return Results.Ok(await auth.ListLoginAuditsAsync(limit ?? 20));
         });
 
-        app.MapGet("/monitor", async (AuthService auth) =>
+        app.MapGet("/admin", async (AuthService auth) =>
         {
             if (!await auth.HasActiveApprovedSessionAsync())
             {

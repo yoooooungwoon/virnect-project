@@ -52,7 +52,8 @@ app.UseStaticFiles();
 
 app.MapAuthEndpoints();
 
-app.MapGet("/monitoring", async (IWebHostEnvironment environment, AuthService auth) =>
+// 전체 모니터링 (4대) — /server
+app.MapGet("/server", async (IWebHostEnvironment environment, AuthService auth) =>
 {
     if (!await auth.HasActiveApprovedSessionAsync())
     {
@@ -63,7 +64,8 @@ app.MapGet("/monitoring", async (IWebHostEnvironment environment, AuthService au
     return Results.File(Path.Combine(webRootPath, "index.html"), "text/html");
 });
 
-app.MapGet("/monitoring/server", async (IWebHostEnvironment environment, AuthService auth) =>
+// 서버별 (/server-01 ~ /server-04) — 경로에서 서버명 (server-숫자 형태만 매칭, /login 등과 충돌 없음)
+app.MapGet("/{server:regex(^server-\\d+$)}", async (string server, IWebHostEnvironment environment, AuthService auth) =>
 {
     if (!await auth.HasActiveApprovedSessionAsync())
     {
@@ -182,6 +184,8 @@ app.MapGet("/api/history/{metric}", async (
 });
 
 // --- 차트 이미지(AR용): SVG / PNG 두 방식 ---------------------------
+// 차트 엔드포인트 — Make&View가 원격 URL 이미지를 못 띄워 비활성화(주석). 재활성화: 아래 /* */ 해제.
+/*
 // GET /api/chart/{server}/{metric}?minutes=60&format=svg|png&w=600&h=300
 app.MapGet("/api/chart/{server}/{metric}", async (
     string server, string metric, int? minutes, string? format, int? w, int? h,
@@ -207,6 +211,7 @@ app.MapGet("/api/chart/{server}/{metric}", async (
 
     return Results.Content(ChartRenderer.RenderSvg(spec, server, points, width, height), "image/svg+xml");
 });
+*/
 
 // --- 이벤트 이력(SQLite) --------------------------------------------
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
