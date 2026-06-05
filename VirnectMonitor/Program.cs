@@ -181,6 +181,33 @@ app.MapGet("/api/history/{metric}", async (
     return Results.Ok(new { metric, unit = spec.Unit, name = spec.Name, series = result });
 });
 
+// --- 차트 이미지(AR용): SVG / PNG 두 방식 ---------------------------
+// GET /api/chart/{server}/{metric}?minutes=60&format=svg|png&w=600&h=300
+app.MapGet("/api/chart/{server}/{metric}", async (
+    string server, string metric, int? minutes, string? format, int? w, int? h,
+    PrometheusClient prom, IConfiguration config, CancellationToken ct) =>
+{
+    if (!Metrics.ById.TryGetValue(metric, out var spec))
+        return Results.NotFound(new { error = "지표 없음", metric });
+
+    var groupLabel = config["Monitor:GroupLabel"] ?? "server";
+    var windowMin = Math.Clamp(minutes ?? 60, 1, 24 * 60);
+    var width = Math.Clamp(w ?? 600, 120, 2000);
+    var height = Math.Clamp(h ?? 300, 80, 1200);
+    var stepSec = windowMin <= 5 ? 10 : windowMin <= 15 ? 15 : windowMin <= 60 ? 30 : windowMin <= 360 ? 120 : 600;
+    var end = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    var start = end - windowMin * 60;
+
+    var series = await prom.QueryRangeAsync(spec.Query, start, end, stepSec, ct);
+    var match = series.FirstOrDefault(x => x.Labels.TryGetValue(groupLabel, out var v) && v == server);
+    var points = match.Points ?? [];
+
+    if (string.Equals(format, "png", StringComparison.OrdinalIgnoreCase))
+        return Results.File(ChartRenderer.RenderPng(spec, points, width, height), "image/png");
+
+    return Results.Content(ChartRenderer.RenderSvg(spec, server, points, width, height), "image/svg+xml");
+});
+
 // --- 이벤트 이력(SQLite) --------------------------------------------
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
     await db.RecentAnomaliesAsync(Math.Clamp(limit ?? 100, 1, 1000), server, metric, ct));
