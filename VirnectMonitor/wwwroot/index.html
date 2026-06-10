@@ -21,6 +21,7 @@
   .server-tabs{display:flex;gap:8px;flex-wrap:wrap}
   .server-tab{border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer}
   .server-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .hidden{display:none!important}
   .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
   .metric-card{min-height:118px;background:var(--panel);border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
   .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800;letter-spacing:0}
@@ -32,7 +33,7 @@
   .metric-card.red{color:var(--red)}.metric-card.mint{color:var(--mint)}.metric-card.sky{color:var(--sky)}
   .metric-card.lime{color:var(--lime)}.metric-card.blue{color:var(--blue)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
-  .chart-card{height:224px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px;color:var(--blue)}
+  .chart-card{height:224px;background:#ffffff;border:3px solid currentColor;border-radius:24px;padding:16px 22px;color:var(--blue)}
   .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
   .chart-card.red{color:var(--red)}.chart-card.mint{color:var(--mint)}.chart-card.sky{color:var(--sky)}
   .chart-card.lime{color:var(--lime)}.chart-card.blue{color:var(--blue)}
@@ -53,7 +54,7 @@
 </header>
 <main>
   <div class="toolbar">
-    <h2 class="section-title">실시간 수치</h2>
+    <h2 class="section-title" id="metricTitle">실시간 수치</h2>
     <div class="server-tabs" id="serverTabs"></div>
   </div>
   <section class="metric-grid" id="metricCards"></section>
@@ -96,6 +97,9 @@ const LEVEL_LABELS = {clean:"정상", caution:"주의", warning:"경고", danger
 const $ = (id) => document.getElementById(id);
 let selectedServer = "";
 let lastServers = {};
+let activeTab = "server";
+const ALL_GRAPHS_TAB = "__all_graphs__";
+const SERVER_LINE_COLORS = ["#111827", "#27349b", "#ff3928", "#16a085", "#8e44ad", "#d35400"];
 
 function stepFor(min){ return min<=5?10 : min<=15?15 : min<=60?30 : min<=360?120 : 600; }
 function fmtBytes(n){
@@ -134,15 +138,29 @@ async function loadStatus(){
 }
 function renderTabs(names){
   $("serverTabs").innerHTML = names.map(name =>
-    `<button class="server-tab ${name===selectedServer?"active":""}" data-server="${name}">${name}</button>`).join("");
-  document.querySelectorAll(".server-tab").forEach(btn => btn.onclick = async () => {
+    `<button class="server-tab ${activeTab==="server" && name===selectedServer?"active":""}" data-server="${name}">${name}</button>`).join("")
+    + `<button class="server-tab ${activeTab==="all"?"active":""}" data-tab="${ALL_GRAPHS_TAB}">&#51204;&#52404; &#44536;&#47000;&#54532;</button>`;
+  document.querySelectorAll(".server-tab[data-server]").forEach(btn => btn.onclick = async () => {
+    activeTab = "server";
     selectedServer = btn.dataset.server;
     renderTabs(names);
     renderCards();
     await loadCharts();
   });
+  document.querySelector(`[data-tab="${ALL_GRAPHS_TAB}"]`).onclick = async () => {
+    activeTab = "all";
+    renderTabs(names);
+    renderCards();
+    await loadCharts();
+  };
 }
 function renderCards(){
+  $("metricTitle").classList.toggle("hidden", activeTab === "all");
+  $("metricCards").classList.toggle("hidden", activeTab === "all");
+  if(activeTab === "all"){
+    $("metricCards").innerHTML = "";
+    return;
+  }
   const server = lastServers[selectedServer];
   if(!server){ $("metricCards").innerHTML = `<div class="empty">표시할 서버 데이터가 없습니다.</div>`; return; }
   $("metricCards").innerHTML = METRICS.map(def => {
@@ -164,12 +182,17 @@ function buildCharts(){
     `<article class="chart-card ${def.color}"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
 }
 async function loadCharts(){
-  if(!selectedServer) return;
+  if(activeTab === "server" && !selectedServer) return;
   const min = parseInt($("selRange").value, 10);
   await Promise.all(METRICS.map(async def => {
     try{
-      const data = await (await fetch(`/api/history/${selectedServer}/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
-      drawLine($(`cv_${def.id}`), data.points || [], def.color, def.id);
+      if(activeTab === "all"){
+        const data = await (await fetch(`/api/history/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
+        drawMultiLine($(`cv_${def.id}`), data.series || [], def.id);
+      }else{
+        const data = await (await fetch(`/api/history/${selectedServer}/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
+        drawLine($(`cv_${def.id}`), data.points || [], def.color, def.id);
+      }
     }catch(e){
       drawLine($(`cv_${def.id}`), [], def.color, def.id);
     }
@@ -228,14 +251,14 @@ function drawLine(canvas, points, colorName, metricId){
     ctx.fillText(new Date(point[0]*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(point[0]), H-17);
   });
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 1;
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";
   ctx.beginPath();
   points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
   ctx.stroke();
   ctx.strokeStyle = "#ff3928";
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 1;
   for(let i=1;i<points.length;i++){
     if(points[i-1][1] >= THRESHOLDS[metricId].caution || points[i][1] >= THRESHOLDS[metricId].caution){
       ctx.beginPath();
@@ -244,6 +267,86 @@ function drawLine(canvas, points, colorName, metricId){
       ctx.stroke();
     }
   }
+}
+function drawMultiLine(canvas, series, metricId){
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width = canvas.clientWidth;
+  const H = canvas.height = canvas.clientHeight || 158;
+  ctx.clearRect(0,0,W,H);
+
+  const names = Object.keys(lastServers).sort();
+  const visible = (series || [])
+    .filter(s => !names.length || names.includes(s.server))
+    .sort((a,b) => String(a.server).localeCompare(String(b.server)));
+  const allPoints = visible.flatMap(s => s.points || []);
+  if(!allPoints.length){
+    ctx.fillStyle = "#9aa0ac";
+    ctx.font = "13px Segoe UI";
+    ctx.fillText("No data", 12, H/2);
+    return;
+  }
+
+  const axis = AXES[metricId];
+  const pad = {l:42,r:88,t:8,b:24};
+  const xs = allPoints.map(p=>p[0]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const yMax = axis.max;
+  const px = x => pad.l + (x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
+  const py = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
+
+  ctx.font = "11px Segoe UI";
+  ctx.lineWidth = 1;
+  ctx.textBaseline = "middle";
+  axis.ticks.forEach((tickValue, i) => {
+    const y = py(tickValue);
+    ctx.strokeStyle = "#e6e8ef";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+    ctx.fillStyle = "#7f8797";
+    ctx.textAlign = "right";
+    ctx.fillText(axis.labels[i], pad.l-7, y);
+  });
+  Object.values(THRESHOLDS[metricId]).forEach(threshold => {
+    const y = py(threshold);
+    ctx.strokeStyle = "rgba(255,57,40,.24)";
+    ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(W-pad.r, y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  const timeValues = [x0, (x0 + x1) / 2, x1];
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#7f8797";
+  timeValues.forEach((value, i) => {
+    ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
+    ctx.fillText(new Date(value*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(value), H-17);
+  });
+
+  visible.forEach((item, idx) => {
+    const points = item.points || [];
+    if(!points.length) return;
+    const color = SERVER_LINE_COLORS[idx % SERVER_LINE_COLORS.length];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.lineJoin = "miter";
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+    ctx.stroke();
+
+    const legendY = pad.t + idx * 18 + 4;
+    ctx.fillStyle = color;
+    ctx.fillRect(W-pad.r+14, legendY-4, 10, 10);
+    ctx.fillStyle = "#18203a";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(item.server, W-pad.r+30, legendY+1);
+  });
 }
 
 (async()=>{
