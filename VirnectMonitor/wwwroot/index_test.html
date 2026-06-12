@@ -36,9 +36,16 @@
   .metric-card.warning{color:var(--orange)}
   .metric-card.danger{color:var(--red)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
-  .chart-card{height:248px;background:#ffffff;border:3px solid var(--blue);border-radius:24px;padding:16px 22px}
+  .chart-card{height:248px;background:#ffffff;border:3px solid var(--blue);border-radius:24px;padding:16px 22px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease}
+  .chart-card:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(24,32,58,.12)}
   .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:var(--blue)}
   canvas{display:block;width:100%;height:182px}
+  .chart-modal{position:fixed;inset:0;z-index:20;background:rgba(12,18,38,.58);display:flex;align-items:center;justify-content:center;padding:28px}
+  .chart-modal-panel{width:min(980px,100%);height:min(660px,86vh);background:#fff;border:3px solid var(--blue);border-radius:18px;padding:20px 24px 24px;box-shadow:0 22px 60px rgba(0,0,0,.28)}
+  .chart-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+  .chart-modal-head h3{margin:0;color:var(--blue);font-size:24px;line-height:1.1}
+  .chart-modal-close{width:34px;height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-size:22px;line-height:1;cursor:pointer}
+  .chart-modal canvas{height:calc(100% - 50px)}
   .empty{color:var(--muted);font-size:14px;padding:30px 0}
   @media (max-width:900px){
     .metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
@@ -73,6 +80,15 @@
   </div>
   <section class="chart-grid" id="charts"></section>
 </main>
+<div class="chart-modal hidden" id="chartModal">
+  <div class="chart-modal-panel" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+    <div class="chart-modal-head">
+      <h3 id="chartModalTitle"></h3>
+      <button class="chart-modal-close" id="chartModalClose" type="button" aria-label="Close">x</button>
+    </div>
+    <canvas id="chartModalCanvas"></canvas>
+  </div>
+</div>
 <script>
 const METRICS = [
   {id:"cpu", label:"CPU 사용률"},
@@ -98,15 +114,22 @@ const THRESHOLDS = {
 const METRIC_UNITS = {cpu:"%", memory:"%", disk:"%", net_recv:"B/s", net_sent:"B/s"};
 const LEVEL_LABELS = {safe:"안전", warning:"경고", danger:"위험"};
 const DUMMY_SERVERS = {
-  "server-01": {cpu:42, memory:64, disk:58, net_recv:230000, net_sent:42000},
-  "server-02": {cpu:88, memory:72, disk:67, net_recv:638000, net_sent:82000},
-  "server-03": {cpu:54, memory:96, disk:92, net_recv:310000, net_sent:151500},
-  "server-04": {cpu:97, memory:78, disk:96, net_recv:690000, net_sent:56000}
+  "server-01": {cpu:24, memory:38, disk:32, net_recv:120000, net_sent:24000},
+  "server-02": {cpu:57, memory:68, disk:61, net_recv:345000, net_sent:72000},
+  "server-03": {cpu:78, memory:91, disk:84, net_recv:515000, net_sent:122000},
+  "server-04": {cpu:94, memory:81, disk:97, net_recv:675000, net_sent:148000}
 };
 const ALL_GRAPHS_TAB = "__all_graphs__";
+const SERVER_COLORS = {
+  "server-01": "#27349b",
+  "server-02": "#2fb344",
+  "server-03": "#f59f00",
+  "server-04": "#ff3928"
+};
 const $ = (id) => document.getElementById(id);
 let selectedServer = "server-01";
 let activeTab = "server";
+let modalMetricId = null;
 
 function stepFor(min){ return min<=5?10 : min<=15?15 : min<=60?30 : min<=360?120 : 600; }
 function metricName(id){ return METRICS.find(m => m.id === id)?.label || id; }
@@ -132,21 +155,47 @@ function zoneFor(metricId, value){
   return "safe";
 }
 function zoneColor(zone){
-  return zone === "danger" ? "#ff3928" : zone === "warning" ? "#f59f00" : "#2fb344";
+  return zone === "danger" ? "#ff3928" : zone === "warning" ? "#f59f00" : "#258f36";
 }
 function stableWave(i, seed){
-  const pattern = [-1, -0.25, 0.7, 0.05, 1, -0.55];
+  const pattern = [-1.15, -0.45, 0.95, -0.2, 1.25, -0.85, 0.55];
   return pattern[(i + Math.floor(seed)) % pattern.length];
+}
+function seededRandom(i, seed){
+  const x = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+function randomInRange(i, seed, min, max){
+  return min + seededRandom(i, seed) * (max - min);
+}
+function metricSeed(metricId){
+  return metricId.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0) / 37;
+}
+function randomRangeFor(serverIndex, metricId){
+  if(metricId === "cpu") return serverIndex === 3 ? [50, 100] : [0, 90];
+  if(metricId === "memory") return serverIndex === 3 ? [55, 100] : [20, 95];
+  if(metricId === "disk") return serverIndex === 3 ? [45, 100] : [10, 98];
+  const max = AXES[metricId].max;
+  return serverIndex === 3 ? [max * 0.45, max] : [0, max * 0.92];
 }
 function generateTestData(server, metricId, minutes){
   const points = [];
   const now = Math.floor(Date.now() / 1000);
   const step = stepFor(minutes);
   const serverIndex = parseInt(serverNo(server), 10);
+  if(serverIndex === 3 || serverIndex === 4){
+    const [minValue, maxValue] = randomRangeFor(serverIndex, metricId);
+    const seed = serverIndex * 3.1 + metricSeed(metricId);
+    for(let i = minutes * 60, idx = 0; i >= 0; i -= step, idx++){
+      points.push([now - i, randomInRange(idx, seed, minValue, maxValue)]);
+    }
+    return points;
+  }
   const base = DUMMY_SERVERS[server][metricId];
-  const variance = metricId.startsWith("net_") ? base * 0.14 : 7;
+  const variance = metricId.startsWith("net_") ? base * 0.24 : 13;
   for(let i = minutes * 60, idx = 0; i >= 0; i -= step, idx++){
-    const raw = base + stableWave(idx, serverIndex * 1.7) * variance;
+    const wave = stableWave(idx, serverIndex * 1.7);
+    const raw = base + wave * variance;
     const max = AXES[metricId].max;
     points.push([now - i, Math.max(0, Math.min(max, raw))]);
   }
@@ -160,9 +209,9 @@ function allSeries(metricId, minutes){
 }
 function renderTabs(){
   const names = Object.keys(DUMMY_SERVERS).sort();
-  $("serverTabs").innerHTML = names.map(name =>
-    `<button class="server-tab ${activeTab==="server" && name===selectedServer ? "active" : ""}" data-server="${name}">${name}</button>`).join("")
-    + `<button class="server-tab ${activeTab==="all" ? "active" : ""}" data-tab="${ALL_GRAPHS_TAB}">전체 그래프</button>`;
+  $("serverTabs").innerHTML = `<button class="server-tab ${activeTab==="all" ? "active" : ""}" data-tab="${ALL_GRAPHS_TAB}">전체 그래프</button>`
+    + names.map(name =>
+    `<button class="server-tab ${activeTab==="server" && name===selectedServer ? "active" : ""}" data-server="${name}">${name}</button>`).join("");
   document.querySelectorAll(".server-tab[data-server]").forEach(btn => btn.onclick = async () => {
     activeTab = "server";
     selectedServer = btn.dataset.server;
@@ -225,15 +274,36 @@ function renderAlerts(){
 }
 function buildCharts(){
   $("charts").innerHTML = METRICS.map(def =>
-    `<article class="chart-card"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
+    `<article class="chart-card" data-metric="${def.id}"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
+  document.querySelectorAll(".chart-card[data-metric]").forEach(card => {
+    card.onclick = () => openChartModal(card.dataset.metric);
+  });
 }
 async function loadCharts(){
   const min = parseInt($("selRange").value, 10);
   METRICS.forEach(def => {
-    if(activeTab === "all") drawMultiLine($(`cv_${def.id}`), allSeries(def.id, min), def.id);
-    else drawLine($(`cv_${def.id}`), generateTestData(selectedServer, def.id, min), def.id);
+    drawMetricChart($(`cv_${def.id}`), def.id, min);
   });
+  renderOpenModalChart();
   $("status").textContent = `테스트 데이터 - 업데이트 ${fmtDate(Math.floor(Date.now() / 1000))}`;
+}
+function drawMetricChart(canvas, metricId, min){
+  if(activeTab === "all") drawMultiLine(canvas, allSeries(metricId, min), metricId);
+  else drawLine(canvas, generateTestData(selectedServer, metricId, min), metricId);
+}
+function openChartModal(metricId){
+  modalMetricId = metricId;
+  $("chartModalTitle").textContent = metricName(metricId);
+  $("chartModal").classList.remove("hidden");
+  renderOpenModalChart();
+}
+function closeChartModal(){
+  modalMetricId = null;
+  $("chartModal").classList.add("hidden");
+}
+function renderOpenModalChart(){
+  if(!modalMetricId || $("chartModal").classList.contains("hidden")) return;
+  drawMetricChart($("chartModalCanvas"), modalMetricId, parseInt($("selRange").value, 10));
 }
 function drawBase(ctx, W, H, points, metricId, rightPad){
   const axis = AXES[metricId];
@@ -263,17 +333,42 @@ function drawBase(ctx, W, H, points, metricId, rightPad){
   });
   return {px, py, pad};
 }
-function drawSegmentedLine(ctx, points, metricId, px, py, width){
+function drawLinePath(ctx, points, px, py, width, color){
   ctx.lineWidth = width;
-  ctx.lineJoin = "miter";
-  ctx.lineCap = "butt";
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  points.forEach((point, idx) => {
+    const x = px(point[0]);
+    const y = py(point[1]);
+    if(idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+function drawSegmentedLine(ctx, points, metricId, px, py, width){
   for(let i=1;i<points.length;i++){
-    const zone = zoneFor(metricId, Math.max(points[i-1][1], points[i][1]));
-    ctx.strokeStyle = zoneColor(zone);
-    ctx.beginPath();
-    ctx.moveTo(px(points[i-1][0]), py(points[i-1][1]));
-    ctx.lineTo(px(points[i][0]), py(points[i][1]));
-    ctx.stroke();
+    const from = points[i-1];
+    const to = points[i];
+    const thresholds = [THRESHOLDS[metricId].warning, THRESHOLDS[metricId].danger];
+    const splitPoints = [from, to];
+    thresholds.forEach(threshold => {
+      const y0 = from[1], y1 = to[1];
+      if(y0 === y1 || (threshold <= Math.min(y0, y1) || threshold >= Math.max(y0, y1))) return;
+      const ratio = (threshold - y0) / (y1 - y0);
+      splitPoints.splice(splitPoints.length - 1, 0, [
+        from[0] + (to[0] - from[0]) * ratio,
+        threshold
+      ]);
+    });
+    splitPoints.sort((a, b) => a[0] - b[0]);
+    for(let j=1;j<splitPoints.length;j++){
+      const a = splitPoints[j-1];
+      const b = splitPoints[j];
+      const midpointValue = (a[1] + b[1]) / 2;
+      drawLinePath(ctx, [a, b], px, py, width, zoneColor(zoneFor(metricId, midpointValue)));
+    }
   }
 }
 function drawLine(canvas, points, metricId){
@@ -288,7 +383,7 @@ function drawLine(canvas, points, metricId){
     return;
   }
   const base = drawBase(ctx, W, H, points, metricId, 8);
-  drawSegmentedLine(ctx, points, metricId, base.px, base.py, 1);
+  drawSegmentedLine(ctx, points, metricId, base.px, base.py, 0.5);
 }
 function drawMultiLine(canvas, series, metricId){
   const ctx = canvas.getContext("2d");
@@ -304,11 +399,11 @@ function drawMultiLine(canvas, series, metricId){
   }
   const base = drawBase(ctx, W, H, allPoints, metricId, 88);
   series.forEach((item, idx) => {
-    ctx.setLineDash(idx === 0 ? [] : idx === 1 ? [7,4] : idx === 2 ? [2,4] : [10,4,2,4]);
-    drawSegmentedLine(ctx, item.points, metricId, base.px, base.py, 1);
+    ctx.setLineDash([]);
+    drawLinePath(ctx, item.points, base.px, base.py, 1.5, SERVER_COLORS[item.server] || "#18203a");
     ctx.setLineDash([]);
     const y = base.pad.t + idx * 18 + 4;
-    ctx.fillStyle = "#18203a";
+    ctx.fillStyle = SERVER_COLORS[item.server] || "#18203a";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(item.server, W-base.pad.r+14, y+1);
@@ -321,6 +416,13 @@ function drawMultiLine(canvas, series, metricId){
   renderSummary();
   renderAlerts();
   $("selRange").onchange = loadCharts;
+  $("chartModal").onclick = (event) => {
+    if(event.target === $("chartModal")) closeChartModal();
+  };
+  $("chartModalClose").onclick = closeChartModal;
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape") closeChartModal();
+  });
   await loadCharts();
   setInterval(()=>{ renderSummary(); renderAlerts(); loadCharts(); }, 5000);
   window.addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(loadCharts,250); });

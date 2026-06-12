@@ -6,7 +6,7 @@
 <title>VIRNECT 시스템 모니터</title>
 <style>
   :root{
-    --blue:#27349b;--red:#ff3928;--mint:#b7d7ce;--sky:#79aeca;--lime:#bfd458;
+    --blue:#27349b;--green:#2fb344;--orange:#f59f00;--red:#ff3928;
     --ink:#18203a;--muted:#7f8797;--page:#f7f8fb;--panel:#fff;--line:#e6e8ef;
   }
   *{box-sizing:border-box}
@@ -16,28 +16,35 @@
   #status{color:var(--muted);font-size:13px;margin-bottom:2px}
   main{max-width:1180px;margin:0 auto;padding:20px 28px 34px;display:flex;flex-direction:column;gap:28px}
   .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  select{height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:0 10px;font-size:13px}
   .section-title{margin:0;color:var(--blue);font-size:18px;font-weight:800}
   .server-tabs{display:flex;gap:8px;flex-wrap:wrap}
   .server-tab{border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer}
   .server-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  select{height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:0 10px;font-size:13px}
+  .alert-list{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+  .alert-item{border-left:4px solid var(--red);background:#fff5f5;border-radius:6px;padding:10px 12px;font-size:14px;font-weight:700;color:#85182a}
+  .alert-empty{color:var(--muted);font-size:14px}
   .hidden{display:none!important}
   .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
-  .metric-card{min-height:118px;background:var(--panel);border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
-  .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800;letter-spacing:0}
+  .metric-card{min-height:118px;background:#ffffff;border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+  .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800}
   .metric-card .value{font-size:25px;font-weight:800;line-height:1.1;color:#111;white-space:nowrap}
-  .metric-card .value.alert{color:var(--red)}
   .metric-card .sub{color:var(--muted);font-size:12px;margin-top:4px;text-align:left}
-  .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid #111;color:#111;padding:4px 9px;font-size:12px;font-weight:700}
-  .metric-card .level.alert{border-color:var(--red);color:var(--red)}
-  .metric-card.red{color:var(--red)}.metric-card.mint{color:var(--mint)}.metric-card.sky{color:var(--sky)}
-  .metric-card.lime{color:var(--lime)}.metric-card.blue{color:var(--blue)}
+  .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid currentColor;color:currentColor;padding:4px 9px;font-size:12px;font-weight:700}
+  .metric-card.safe{color:var(--green)}
+  .metric-card.warning{color:var(--orange)}
+  .metric-card.danger{color:var(--red)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
-  .chart-card{height:224px;background:#ffffff;border:3px solid currentColor;border-radius:24px;padding:16px 22px;color:var(--blue)}
-  .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
-  .chart-card.red{color:var(--red)}.chart-card.mint{color:var(--mint)}.chart-card.sky{color:var(--sky)}
-  .chart-card.lime{color:var(--lime)}.chart-card.blue{color:var(--blue)}
-  canvas{display:block;width:100%;height:158px}
+  .chart-card{height:248px;background:#ffffff;border:3px solid var(--blue);border-radius:24px;padding:16px 22px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease}
+  .chart-card:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(24,32,58,.12)}
+  .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:var(--blue)}
+  canvas{display:block;width:100%;height:182px}
+  .chart-modal{position:fixed;inset:0;z-index:20;background:rgba(12,18,38,.58);display:flex;align-items:center;justify-content:center;padding:28px}
+  .chart-modal-panel{width:min(980px,100%);height:min(660px,86vh);background:#fff;border:3px solid var(--blue);border-radius:18px;padding:20px 24px 24px;box-shadow:0 22px 60px rgba(0,0,0,.28)}
+  .chart-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+  .chart-modal-head h3{margin:0;color:var(--blue);font-size:24px;line-height:1.1}
+  .chart-modal-close{width:34px;height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-size:22px;line-height:1;cursor:pointer}
+  .chart-modal canvas{height:calc(100% - 50px)}
   .empty{color:var(--muted);font-size:14px;padding:30px 0}
   @media (max-width:900px){
     .metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
@@ -54,9 +61,10 @@
 </header>
 <main>
   <div class="toolbar">
-    <h2 class="section-title" id="metricTitle">실시간 수치</h2>
+    <h2 class="section-title" id="summaryTitle">실시간 수치</h2>
     <div class="server-tabs" id="serverTabs"></div>
   </div>
+  <section class="alert-list" id="alerts"></section>
   <section class="metric-grid" id="metricCards"></section>
 
   <div class="toolbar">
@@ -71,13 +79,22 @@
   </div>
   <section class="chart-grid" id="charts"></section>
 </main>
+<div class="chart-modal hidden" id="chartModal">
+  <div class="chart-modal-panel" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+    <div class="chart-modal-head">
+      <h3 id="chartModalTitle"></h3>
+      <button class="chart-modal-close" id="chartModalClose" type="button" aria-label="Close">x</button>
+    </div>
+    <canvas id="chartModalCanvas"></canvas>
+  </div>
+</div>
 <script>
 const METRICS = [
-  {id:"cpu", label:"CPU 사용률", color:"red"},
-  {id:"memory", label:"메모리 사용률", color:"mint"},
-  {id:"disk", label:"디스크 사용률(C:)", color:"lime"},
-  {id:"net_recv", label:"네트워크 수신량", color:"blue"},
-  {id:"net_sent", label:"네트워크 송신량", color:"sky"}
+  {id:"cpu", label:"CPU 사용률"},
+  {id:"memory", label:"메모리 사용률"},
+  {id:"disk", label:"디스크 사용률(C:)"},
+  {id:"net_recv", label:"네트워크 수신량"},
+  {id:"net_sent", label:"네트워크 송신량"}
 ];
 const AXES = {
   cpu: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
@@ -87,21 +104,33 @@ const AXES = {
   net_sent: {max:158000, ticks:[0,39000,79000,118000,158000], labels:["0k","39k","79k","118k","158k"]}
 };
 const THRESHOLDS = {
-  cpu: {caution:70, warning:85, danger:95},
-  memory: {caution:75, warning:85, danger:95},
-  disk: {caution:80, warning:90, danger:95},
-  net_recv: {caution:504000, warning:612000, danger:684000},
-  net_sent: {caution:110600, warning:134300, danger:150100}
+  cpu: {warning:85, danger:95},
+  memory: {warning:85, danger:95},
+  disk: {warning:90, danger:95},
+  net_recv: {warning:612000, danger:684000},
+  net_sent: {warning:134300, danger:150100}
 };
-const LEVEL_LABELS = {clean:"정상", caution:"주의", warning:"경고", danger:"위험"};
+const LEVEL_LABELS = {safe:"안전", warning:"경고", danger:"위험"};
+const SERVER_COLORS = {
+  "server-01": "#27349b",
+  "server-02": "#2fb344",
+  "server-03": "#f59f00",
+  "server-04": "#ff3928",
+  "01": "#27349b",
+  "02": "#2fb344",
+  "03": "#f59f00",
+  "04": "#ff3928"
+};
 const $ = (id) => document.getElementById(id);
 let selectedServer = "";
 let lastServers = {};
 let activeTab = "server";
+let modalMetricId = null;
 const ALL_GRAPHS_TAB = "__all_graphs__";
-const SERVER_LINE_COLORS = ["#111827", "#27349b", "#ff3928", "#16a085", "#8e44ad", "#d35400"];
 
 function stepFor(min){ return min<=5?10 : min<=15?15 : min<=60?30 : min<=360?120 : 600; }
+function metricName(id){ return METRICS.find(m => m.id === id)?.label || id; }
+function serverNo(name){ return (name.match(/\d+$/) || [name])[0]; }
 function fmtBytes(n){
   const units=["B/s","KB/s","MB/s","GB/s"]; let i=0;
   while(Math.abs(n)>=1024 && i<units.length-1){ n/=1024; i++; }
@@ -113,14 +142,23 @@ function displayMetric(m){
   if(m.unit === "%") return `${m.value.toFixed(1)}%`;
   return m.display || String(m.value);
 }
-function levelText(m){ return m?.levelText || "-"; }
-function levelFor(id, value){
+function fmtDate(ts){
+  const d = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function zoneFor(id, value){
   const t = THRESHOLDS[id];
-  if(!t || typeof value !== "number") return "clean";
+  if(!t || typeof value !== "number") return "safe";
   if(value >= t.danger) return "danger";
   if(value >= t.warning) return "warning";
-  if(value >= t.caution) return "caution";
-  return "clean";
+  return "safe";
+}
+function zoneColor(zone){
+  return zone === "danger" ? "#ff3928" : zone === "warning" ? "#f59f00" : "#258f36";
+}
+function serverColor(server){
+  return SERVER_COLORS[server] || SERVER_COLORS[serverNo(server)] || "#18203a";
 }
 
 async function loadStatus(){
@@ -130,7 +168,8 @@ async function loadStatus(){
     const names = Object.keys(lastServers).sort();
     if(!selectedServer || !lastServers[selectedServer]) selectedServer = names[0] || "";
     renderTabs(names);
-    renderCards();
+    renderSummary();
+    renderAlerts();
     $("status").textContent = data.ts ? `업데이트 ${new Date(data.ts*1000).toLocaleTimeString("ko-KR")}` : "데이터 대기 중";
   }catch(e){
     $("status").textContent = "연결 실패";
@@ -144,81 +183,109 @@ function renderTabs(names){
     activeTab = "server";
     selectedServer = btn.dataset.server;
     renderTabs(names);
-    renderCards();
+    renderSummary();
+    renderAlerts();
     await loadCharts();
   });
   document.querySelector(`[data-tab="${ALL_GRAPHS_TAB}"]`).onclick = async () => {
     activeTab = "all";
     renderTabs(names);
-    renderCards();
+    renderSummary();
+    renderAlerts();
     await loadCharts();
   };
 }
-function renderCards(){
-  $("metricTitle").classList.toggle("hidden", activeTab === "all");
+function renderSummary(){
+  $("summaryTitle").textContent = activeTab === "all" ? "실시간 알림" : "실시간 수치";
+  $("alerts").classList.toggle("hidden", activeTab !== "all");
   $("metricCards").classList.toggle("hidden", activeTab === "all");
   if(activeTab === "all"){
     $("metricCards").innerHTML = "";
-    return;
+  }else{
+    renderCards();
   }
+}
+function renderCards(){
   const server = lastServers[selectedServer];
   if(!server){ $("metricCards").innerHTML = `<div class="empty">표시할 서버 데이터가 없습니다.</div>`; return; }
   $("metricCards").innerHTML = METRICS.map(def => {
     const m = server.metrics?.[def.id];
-    const level = m ? levelFor(def.id, m.value) : "clean";
-    const alertClass = level === "clean" ? "" : " alert";
-    return `<article class="metric-card ${def.color}">
+    const zone = m ? zoneFor(def.id, m.value) : "safe";
+    return `<article class="metric-card ${zone}">
       <h2>${def.label}</h2>
       <div>
-        <div class="value${alertClass}">${displayMetric(m)}</div>
+        <div class="value">${displayMetric(m)}</div>
         <div class="sub">${selectedServer}</div>
       </div>
-      <span class="level${alertClass}">${m ? LEVEL_LABELS[level] : "-"}</span>
+      <span class="level">${m ? LEVEL_LABELS[zone] : "-"}</span>
     </article>`;
   }).join("");
 }
+function renderAlerts(){
+  if(activeTab !== "all"){
+    $("alerts").innerHTML = "";
+    return;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const alerts = [];
+  Object.entries(lastServers).forEach(([name, server]) => {
+    Object.entries(server.metrics || {}).forEach(([metricId, metric]) => {
+      if(zoneFor(metricId, metric.value) === "danger"){
+        alerts.push(`서버 ${serverNo(name)}번의 ${metricName(metricId)}이 위험합니다. (${fmtDate(now)})`);
+      }
+    });
+  });
+  $("alerts").innerHTML = alerts.length
+    ? alerts.map(text => `<div class="alert-item">${text}</div>`).join("")
+    : `<div class="alert-empty">현재 위험 구간에 도달한 항목이 없습니다.</div>`;
+}
 function buildCharts(){
   $("charts").innerHTML = METRICS.map(def =>
-    `<article class="chart-card ${def.color}"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
+    `<article class="chart-card" data-metric="${def.id}"><h3>${def.label}</h3><canvas id="cv_${def.id}"></canvas></article>`).join("");
+  document.querySelectorAll(".chart-card[data-metric]").forEach(card => {
+    card.onclick = () => openChartModal(card.dataset.metric);
+  });
 }
 async function loadCharts(){
   if(activeTab === "server" && !selectedServer) return;
   const min = parseInt($("selRange").value, 10);
-  await Promise.all(METRICS.map(async def => {
-    try{
-      if(activeTab === "all"){
-        const data = await (await fetch(`/api/history/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
-        drawMultiLine($(`cv_${def.id}`), data.series || [], def.id);
-      }else{
-        const data = await (await fetch(`/api/history/${selectedServer}/${def.id}?minutes=${min}&step=${stepFor(min)}`)).json();
-        drawLine($(`cv_${def.id}`), data.points || [], def.color, def.id);
-      }
-    }catch(e){
-      drawLine($(`cv_${def.id}`), [], def.color, def.id);
+  await Promise.all(METRICS.map(def => drawMetricChart($(`cv_${def.id}`), def.id, min)));
+  await renderOpenModalChart();
+}
+async function drawMetricChart(canvas, metricId, min){
+  try{
+    if(activeTab === "all"){
+      const data = await (await fetch(`/api/history/${metricId}?minutes=${min}&step=${stepFor(min)}`)).json();
+      drawMultiLine(canvas, data.series || [], metricId);
+    }else{
+      const data = await (await fetch(`/api/history/${selectedServer}/${metricId}?minutes=${min}&step=${stepFor(min)}`)).json();
+      drawLine(canvas, data.points || [], metricId);
     }
-  }));
-}
-function colorValue(name){
-  return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || "#27349b";
-}
-function drawLine(canvas, points, colorName, metricId){
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width = canvas.clientWidth;
-  const H = canvas.height = canvas.clientHeight || 158;
-  ctx.clearRect(0,0,W,H);
-  if(!points.length){
-    ctx.fillStyle = "#9aa0ac";
-    ctx.font = "13px Segoe UI";
-    ctx.fillText("데이터 없음", 12, H/2);
-    return;
+  }catch(e){
+    drawLine(canvas, [], metricId);
   }
+}
+function openChartModal(metricId){
+  modalMetricId = metricId;
+  $("chartModalTitle").textContent = metricName(metricId);
+  $("chartModal").classList.remove("hidden");
+  renderOpenModalChart();
+}
+function closeChartModal(){
+  modalMetricId = null;
+  $("chartModal").classList.add("hidden");
+}
+async function renderOpenModalChart(){
+  if(!modalMetricId || $("chartModal").classList.contains("hidden")) return;
+  await drawMetricChart($("chartModalCanvas"), modalMetricId, parseInt($("selRange").value, 10));
+}
+function drawBase(ctx, W, H, points, metricId, rightPad){
   const axis = AXES[metricId];
-  const pad = {l:42,r:8,t:8,b:24};
-  const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
+  const pad = {l:42,r:rightPad,t:8,b:24};
+  const xs = points.map(p=>p[0]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const yMax = axis.max;
   const px = x => pad.l + (x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
-  const py = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
+  const py = y => H-pad.b - (y/axis.max)*(H-pad.t-pad.b);
   ctx.font = "11px Segoe UI";
   ctx.lineWidth = 1;
   ctx.textBaseline = "middle";
@@ -233,45 +300,69 @@ function drawLine(canvas, points, colorName, metricId){
     ctx.textAlign = "right";
     ctx.fillText(axis.labels[i], pad.l-7, y);
   });
-  Object.values(THRESHOLDS[metricId]).forEach(threshold => {
-    const y = py(threshold);
-    ctx.strokeStyle = "rgba(255,57,40,.32)";
-    ctx.setLineDash([5,5]);
-    ctx.beginPath();
-    ctx.moveTo(pad.l, y);
-    ctx.lineTo(W-pad.r, y);
-    ctx.stroke();
-  });
-  ctx.setLineDash([]);
-  const timeLabels = [points[0], points[Math.floor(points.length/2)], points[points.length-1]];
   ctx.textBaseline = "top";
-  ctx.fillStyle = "#7f8797";
-  timeLabels.forEach((point, i) => {
+  [x0, (x0+x1)/2, x1].forEach((value, i) => {
     ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
-    ctx.fillText(new Date(point[0]*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(point[0]), H-17);
+    ctx.fillText(new Date(value*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(value), H-17);
   });
-  ctx.strokeStyle = "#111";
-  ctx.lineWidth = 1;
-  ctx.lineJoin = "miter";
-  ctx.lineCap = "butt";
+  return {px, py, pad};
+}
+function drawLinePath(ctx, points, px, py, width, color){
+  ctx.lineWidth = width;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = color;
   ctx.beginPath();
-  points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+  points.forEach((point, idx) => {
+    const x = px(point[0]);
+    const y = py(point[1]);
+    if(idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
   ctx.stroke();
-  ctx.strokeStyle = "#ff3928";
-  ctx.lineWidth = 1;
+}
+function drawSegmentedLine(ctx, points, metricId, px, py, width){
   for(let i=1;i<points.length;i++){
-    if(points[i-1][1] >= THRESHOLDS[metricId].caution || points[i][1] >= THRESHOLDS[metricId].caution){
-      ctx.beginPath();
-      ctx.moveTo(px(points[i-1][0]), py(points[i-1][1]));
-      ctx.lineTo(px(points[i][0]), py(points[i][1]));
-      ctx.stroke();
+    const from = points[i-1];
+    const to = points[i];
+    const thresholds = [THRESHOLDS[metricId].warning, THRESHOLDS[metricId].danger];
+    const splitPoints = [from, to];
+    thresholds.forEach(threshold => {
+      const y0 = from[1], y1 = to[1];
+      if(y0 === y1 || (threshold <= Math.min(y0, y1) || threshold >= Math.max(y0, y1))) return;
+      const ratio = (threshold - y0) / (y1 - y0);
+      splitPoints.splice(splitPoints.length - 1, 0, [
+        from[0] + (to[0] - from[0]) * ratio,
+        threshold
+      ]);
+    });
+    splitPoints.sort((a, b) => a[0] - b[0]);
+    for(let j=1;j<splitPoints.length;j++){
+      const a = splitPoints[j-1];
+      const b = splitPoints[j];
+      const midpointValue = (a[1] + b[1]) / 2;
+      drawLinePath(ctx, [a, b], px, py, width, zoneColor(zoneFor(metricId, midpointValue)));
     }
   }
+}
+function drawLine(canvas, points, metricId){
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width = canvas.clientWidth;
+  const H = canvas.height = canvas.clientHeight || 182;
+  ctx.clearRect(0,0,W,H);
+  if(!points.length){
+    ctx.fillStyle = "#9aa0ac";
+    ctx.font = "13px Segoe UI";
+    ctx.fillText("No data", 12, H/2);
+    return;
+  }
+  const base = drawBase(ctx, W, H, points, metricId, 8);
+  drawSegmentedLine(ctx, points, metricId, base.px, base.py, 0.5);
 }
 function drawMultiLine(canvas, series, metricId){
   const ctx = canvas.getContext("2d");
   const W = canvas.width = canvas.clientWidth;
-  const H = canvas.height = canvas.clientHeight || 158;
+  const H = canvas.height = canvas.clientHeight || 182;
   ctx.clearRect(0,0,W,H);
 
   const names = Object.keys(lastServers).sort();
@@ -285,73 +376,31 @@ function drawMultiLine(canvas, series, metricId){
     ctx.fillText("No data", 12, H/2);
     return;
   }
-
-  const axis = AXES[metricId];
-  const pad = {l:42,r:88,t:8,b:24};
-  const xs = allPoints.map(p=>p[0]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const yMax = axis.max;
-  const px = x => pad.l + (x-x0)/((x1-x0)||1)*(W-pad.l-pad.r);
-  const py = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
-
-  ctx.font = "11px Segoe UI";
-  ctx.lineWidth = 1;
-  ctx.textBaseline = "middle";
-  axis.ticks.forEach((tickValue, i) => {
-    const y = py(tickValue);
-    ctx.strokeStyle = "#e6e8ef";
-    ctx.beginPath();
-    ctx.moveTo(pad.l, y);
-    ctx.lineTo(W-pad.r, y);
-    ctx.stroke();
-    ctx.fillStyle = "#7f8797";
-    ctx.textAlign = "right";
-    ctx.fillText(axis.labels[i], pad.l-7, y);
-  });
-  Object.values(THRESHOLDS[metricId]).forEach(threshold => {
-    const y = py(threshold);
-    ctx.strokeStyle = "rgba(255,57,40,.24)";
-    ctx.setLineDash([5,5]);
-    ctx.beginPath();
-    ctx.moveTo(pad.l, y);
-    ctx.lineTo(W-pad.r, y);
-    ctx.stroke();
-  });
-  ctx.setLineDash([]);
-
-  const timeValues = [x0, (x0 + x1) / 2, x1];
-  ctx.textBaseline = "top";
-  ctx.fillStyle = "#7f8797";
-  timeValues.forEach((value, i) => {
-    ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center";
-    ctx.fillText(new Date(value*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(value), H-17);
-  });
-
+  const base = drawBase(ctx, W, H, allPoints, metricId, 88);
   visible.forEach((item, idx) => {
     const points = item.points || [];
     if(!points.length) return;
-    const color = SERVER_LINE_COLORS[idx % SERVER_LINE_COLORS.length];
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.lineJoin = "miter";
-    ctx.lineCap = "butt";
-    ctx.beginPath();
-    points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
-    ctx.stroke();
-
-    const legendY = pad.t + idx * 18 + 4;
-    ctx.fillStyle = color;
-    ctx.fillRect(W-pad.r+14, legendY-4, 10, 10);
-    ctx.fillStyle = "#18203a";
+    ctx.setLineDash([]);
+    drawLinePath(ctx, points, base.px, base.py, 1.5, serverColor(item.server));
+    ctx.setLineDash([]);
+    const y = base.pad.t + idx * 18 + 4;
+    ctx.fillStyle = serverColor(item.server);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(item.server, W-pad.r+30, legendY+1);
+    ctx.fillText(item.server, W-base.pad.r+14, y+1);
   });
 }
 
 (async()=>{
   buildCharts();
   $("selRange").onchange = loadCharts;
+  $("chartModal").onclick = (event) => {
+    if(event.target === $("chartModal")) closeChartModal();
+  };
+  $("chartModalClose").onclick = closeChartModal;
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape") closeChartModal();
+  });
   await loadStatus();
   await loadCharts();
   setInterval(async()=>{ await loadStatus(); }, 5000);
