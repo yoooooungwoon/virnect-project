@@ -1,5 +1,6 @@
 // 모니터링 백엔드 진입점 — 수집기 등록 + Make&View/웹 프론트용 GET API 구성
 using VirnectMonitor.Models;
+using VirnectMonitor.Auth;
 using VirnectMonitor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,15 @@ builder.Services.AddSingleton<PrometheusClient>();
 builder.Services.AddSingleton<MonitorStore>();
 builder.Services.AddSingleton<MonitorDatabase>();
 builder.Services.AddHostedService<CollectorService>();
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<PasswordHasher>();
+builder.Services.AddSingleton<AuthSessionRepository>();
+builder.Services.AddSingleton<UserRepository>();
+builder.Services.AddSingleton<LoginAuditRepository>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddHostedService<AuthSessionCleanupService>();
 
 // AR/웹 프론트가 다른 출처에서 GET 호출할 수 있게 CORS 허용
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
@@ -19,10 +29,52 @@ var app = builder.Build();
 
 // DB 초기화(테이블 생성)
 await app.Services.GetRequiredService<MonitorDatabase>().InitializeAsync();
+await app.Services.GetRequiredService<UserRepository>().InitializeAsync();
+await app.Services.GetRequiredService<LoginAuditRepository>().InitializeAsync();
+await app.Services.GetRequiredService<AuthSessionRepository>().InitializeAsync();
 
 app.UseCors();
-app.UseDefaultFiles();
+app.Use(async (context, next) =>
+{
+    if (IsDashboardStaticPath(context.Request.Path))
+    {
+        var auth = context.RequestServices.GetRequiredService<AuthService>();
+        if (!await auth.HasActiveApprovedSessionAsync())
+        {
+            context.Response.Redirect("/auth/start");
+            return;
+        }
+    }
+
+    await next();
+});
 app.UseStaticFiles();
+
+app.MapAuthEndpoints();
+
+// 전체 모니터링 (4대) — /server
+app.MapGet("/server", async (IWebHostEnvironment environment, AuthService auth) =>
+{
+    if (!await auth.HasActiveApprovedSessionAsync())
+    {
+        return Results.Redirect("/auth/start");
+    }
+
+    var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+    return Results.File(Path.Combine(webRootPath, "index.html"), "text/html");
+});
+
+// 서버별 (/server-01 ~ /server-04) — 경로에서 서버명 (server-숫자 형태만 매칭, /login 등과 충돌 없음)
+app.MapGet("/{server:regex(^server-\\d+$)}", async (string server, IWebHostEnvironment environment, AuthService auth) =>
+{
+    if (!await auth.HasActiveApprovedSessionAsync())
+    {
+        return Results.Redirect("/auth/start");
+    }
+
+    var webRootPath = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+    return Results.File(Path.Combine(webRootPath, "server.html"), "text/html");
+});
 
 // --- 상태/헬스 -------------------------------------------------------
 app.MapGet("/api/health", (MonitorStore store, IConfiguration config) => new
@@ -131,6 +183,36 @@ app.MapGet("/api/history/{metric}", async (
     return Results.Ok(new { metric, unit = spec.Unit, name = spec.Name, series = result });
 });
 
+// --- 차트 이미지(AR용): SVG / PNG 두 방식 ---------------------------
+// 차트 엔드포인트 — Make&View가 원격 URL 이미지를 못 띄워 비활성화(주석). 재활성화: 아래 /* */ 해제.
+/*
+// GET /api/chart/{server}/{metric}?minutes=60&format=svg|png&w=600&h=300
+app.MapGet("/api/chart/{server}/{metric}", async (
+    string server, string metric, int? minutes, string? format, int? w, int? h,
+    PrometheusClient prom, IConfiguration config, CancellationToken ct) =>
+{
+    if (!Metrics.ById.TryGetValue(metric, out var spec))
+        return Results.NotFound(new { error = "지표 없음", metric });
+
+    var groupLabel = config["Monitor:GroupLabel"] ?? "server";
+    var windowMin = Math.Clamp(minutes ?? 60, 1, 24 * 60);
+    var width = Math.Clamp(w ?? 600, 120, 2000);
+    var height = Math.Clamp(h ?? 300, 80, 1200);
+    var stepSec = windowMin <= 5 ? 10 : windowMin <= 15 ? 15 : windowMin <= 60 ? 30 : windowMin <= 360 ? 120 : 600;
+    var end = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    var start = end - windowMin * 60;
+
+    var series = await prom.QueryRangeAsync(spec.Query, start, end, stepSec, ct);
+    var match = series.FirstOrDefault(x => x.Labels.TryGetValue(groupLabel, out var v) && v == server);
+    var points = match.Points ?? [];
+
+    if (string.Equals(format, "png", StringComparison.OrdinalIgnoreCase))
+        return Results.File(ChartRenderer.RenderPng(spec, points, width, height), "image/png");
+
+    return Results.Content(ChartRenderer.RenderSvg(spec, server, points, width, height), "image/svg+xml");
+});
+*/
+
 // --- 이벤트 이력(SQLite) --------------------------------------------
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
     await db.RecentAnomaliesAsync(Math.Clamp(limit ?? 100, 1, 1000), server, metric, ct));
@@ -139,3 +221,9 @@ app.MapGet("/api/alerts", async (MonitorDatabase db, int? limit, string? server,
     await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), server, ct));
 
 app.Run();
+
+static bool IsDashboardStaticPath(PathString path)
+{
+    return path.Equals("/index.html", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/server.html", StringComparison.OrdinalIgnoreCase);
+}

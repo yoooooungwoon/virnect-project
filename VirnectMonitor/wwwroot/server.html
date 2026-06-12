@@ -29,7 +29,7 @@
   .metric-card .level.alert{border-color:var(--red);color:var(--red)}
   .red{color:var(--red)}.mint{color:var(--mint)}.sky{color:var(--sky)}.lime{color:var(--lime)}.blue{color:var(--blue)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
-  .chart-card{height:224px;background:#ffffff;border:3px solid currentColor;border-radius:24px;padding:16px 22px}
+  .chart-card{height:224px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px}
   .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
   canvas{display:block;width:100%;height:158px}
   .empty{color:var(--muted);font-size:14px;padding:30px 0}
@@ -213,14 +213,14 @@ function drawLine(canvas, points, colorName, metricId){
     ctx.fillText(new Date(point[0]*1000).toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit"}), px(point[0]), H-17);
   });
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 5;
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";
   ctx.beginPath();
   points.forEach((p,i)=>{ const x=px(p[0]), y=py(p[1]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
   ctx.stroke();
   ctx.strokeStyle = "#ff3928";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 5;
   for(let i=1;i<points.length;i++){
     if(points[i-1][1] >= THRESHOLDS[metricId].caution || points[i][1] >= THRESHOLDS[metricId].caution){
       ctx.beginPath();
