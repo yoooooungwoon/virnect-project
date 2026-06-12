@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!-- VIRNECT 시스템 모니터 — 전체 API 레퍼런스 (모니터링 데이터 + 인증) -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIRNECT 모니터 · API 레퍼런스</title>
+<style>
+  :root{
+    --bg:#0c0e14;--panel:#151823;--panel2:#1b1f2e;--line:#272c3d;
+    --ink:#e6e8ef;--muted:#9aa0ac;--blue:#4f8cff;--green:#2fb344;
+    --orange:#f59f00;--red:#ff3928;--violet:#9a7cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Malgun Gothic",sans-serif;line-height:1.55}
+  code,pre{font-family:"Cascadia Code","Consolas",monospace}
+  header{padding:34px 28px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#11141d,#0c0e14)}
+  .wrap{max-width:1060px;margin:0 auto}
+  h1{margin:0;font-size:28px;font-weight:800;color:#fff}
+  h1 span{color:var(--blue)}
+  .sub{color:var(--muted);font-size:14px;margin-top:6px}
+  .base{margin-top:14px;display:inline-block;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px}
+  .base b{color:var(--green)}
+  main{max-width:1060px;margin:0 auto;padding:26px 28px 60px}
+  h2{margin:38px 0 14px;font-size:20px;color:#fff;
+    border-left:4px solid var(--blue);padding-left:12px}
+  .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:18px 0}
+  .legend .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .legend h3{margin:0 0 8px;font-size:14px;color:var(--violet)}
+  .legend table{width:100%;border-collapse:collapse;font-size:13px}
+  .legend td{padding:3px 0;color:var(--muted)}
+  .legend td:first-child{color:var(--ink);font-weight:700;width:54px}
+  .api{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin:12px 0}
+  .api .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .m{font-size:11px;font-weight:800;padding:3px 9px;border-radius:5px;letter-spacing:.5px}
+  .GET{background:rgba(79,140,255,.16);color:#7fb0ff;border:1px solid rgba(79,140,255,.4)}
+  .POST{background:rgba(47,179,68,.16);color:#5fd178;border:1px solid rgba(47,179,68,.4)}
+  .path{font-size:15px;font-weight:700;color:#fff}
+  .tag{margin-left:auto;font-size:11px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .tag.new{color:#5fd178;border-color:rgba(47,179,68,.4)}
+  .tag.auth{color:var(--orange);border-color:rgba(245,159,0,.4)}
+  .desc{color:var(--muted);font-size:13.5px;margin:8px 0 0}
+  .params{margin:10px 0 0;font-size:13px}
+  .params b{color:var(--ink)}
+  pre{background:#0a0c12;border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;margin:10px 0 0;overflow-x:auto;font-size:12.5px;color:#cdd2e0}
+  .k{color:#7fb0ff}.s{color:#8fe39a}.n{color:#f0a868}
+  .note{background:rgba(245,159,0,.08);border:1px solid rgba(245,159,0,.3);
+    border-radius:8px;padding:10px 14px;font-size:13px;color:#e9c684;margin:10px 0 0}
+  footer{max-width:1060px;margin:0 auto;padding:24px 28px 50px;color:var(--muted);font-size:12px;
+    border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>VIRNECT 시스템 모니터 · <span>API 레퍼런스</span></h1>
+  <div class="sub">windows_exporter → Prometheus → 모니터 백엔드(ASP.NET) → 웹 대시보드 / AR(Make&View)</div>
+  <div class="base">Base URL · <b>https://monitor.yongun.shop</b></div>
+</div></header>
+
+<main>
+  <!-- ── 공통 규칙 ───────────────────────────────────── -->
+  <h2>공통 규칙</h2>
+  <div class="legend">
+    <div class="box">
+      <h3>powercode / powerstate (서버 전원)</h3>
+      <table>
+        <tr><td>1</td><td>켜짐 · "on"</td></tr>
+        <tr><td>0</td><td>꺼짐 · "off"</td></tr>
+      </table>
+      <div class="desc">Prometheus <code>up</code> 메트릭 기준. 꺼진 서버도 잡힘.</div>
+    </div>
+    <div class="box">
+      <h3>status (지표 상태, AR용)</h3>
+      <table>
+        <tr><td>1</td><td>클린(정상)</td></tr>
+        <tr><td>0</td><td>경고</td></tr>
+        <tr><td>-1</td><td>위험</td></tr>
+      </table>
+      <div class="desc">= 1 − levelCode</div>
+    </div>
+    <div class="box">
+      <h3>levelCode (지표 분류, 기존)</h3>
+      <table>
+        <tr><td>0</td><td>클린</td></tr>
+        <tr><td>1</td><td>보통(경고)</td></tr>
+        <tr><td>2</td><td>위험</td></tr>
+      </table>
+    </div>
+    <div class="box">
+      <h3>공통 값</h3>
+      <table>
+        <tr><td>서버</td><td>server-01 ~ server-04</td></tr>
+        <tr><td>지표</td><td>cpu, memory, disk, net_recv, net_sent</td></tr>
+        <tr><td>시간</td><td>updatedAt(Unix초) + updatedAtText(KST 문자열)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 화면 페이지 ───────────────────────────────────── -->
+  <h2>화면 페이지 (HTML)</h2>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/server</span>
+      <span class="tag auth">로그인 필요</span></div>
+    <p class="desc">전체 대시보드 (4대 + 전체그래프 탭). 미인증 시 <code>/auth/start</code>로 리다이렉트.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/server-01 ~ /server-04</span>
+      <span class="tag auth">로그인 필요</span></div>
+    <p class="desc">서버 1대 전용 대시보드(server.html). 임계선 그래프 포함.</p>
+  </div>
+
+  <!-- ── 모니터링 데이터 API ───────────────────────────── -->
+  <h2>모니터링 데이터 API</h2>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/health</span></div>
+    <p class="desc">백엔드 상태 + 마지막 수집 시각 + 서버 목록.</p>
+<pre>{
+  <span class="k">"ok"</span>: <span class="n">true</span>,
+  <span class="k">"lastUpdated"</span>: <span class="n">1781257155</span>,
+  <span class="k">"lastUpdatedText"</span>: <span class="s">"2026-06-12 18:39:15"</span>,
+  <span class="k">"lastError"</span>: <span class="n">null</span>,
+  <span class="k">"prometheusUrl"</span>: <span class="s">"http://prometheus:9090"</span>,
+  <span class="k">"servers"</span>: [<span class="s">"server-01"</span>, <span class="s">"server-02"</span>, <span class="s">"server-03"</span>]
+}</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/metrics</span></div>
+    <p class="desc">지표 정의와 임계치(warn/danger). 프론트 표시용.</p>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/status</span></div>
+    <p class="desc">모든 서버 현재 스냅샷 (웹 대시보드 메인). <code>servers</code>는 켜진 서버만.</p>
+<pre>{ <span class="k">"ts"</span>: <span class="n">1781257155</span>, <span class="k">"tsText"</span>: <span class="s">"2026-06-12 18:39:15"</span>, <span class="k">"servers"</span>: { ... } }</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/server/{server}</span>
+      <span class="tag new">전원·알림수 통합</span></div>
+    <p class="desc">서버 1대 종합 — 전원 on/off + 알림수 + 지표별 status. <b>꺼진 서버도</b> powercode:0으로 응답. 없는 서버는 404.</p>
+<pre>{
+  <span class="k">"server"</span>: <span class="s">"server-01"</span>,
+  <span class="k">"powercode"</span>: <span class="n">1</span>,            <span class="k">// 1 켜짐 / 0 꺼짐</span>
+  <span class="k">"powerstate"</span>: <span class="s">"on"</span>,         <span class="k">// "on" / "off"</span>
+  <span class="k">"alertNum"</span>: <span class="n">1</span>,             <span class="k">// 이상징후 개수</span>
+  <span class="k">"updatedAt"</span>: <span class="n">1781257155</span>,
+  <span class="k">"updatedAtText"</span>: <span class="s">"2026-06-12 18:39:15"</span>,
+  <span class="k">"metrics"</span>: {
+    <span class="k">"cpu"</span>: { <span class="k">"value"</span>: <span class="n">79.5</span>, <span class="k">"display"</span>: <span class="s">"79.5%"</span>, <span class="k">"levelCode"</span>: <span class="n">1</span>, <span class="k">"status"</span>: <span class="n">0</span>, <span class="k">"unit"</span>: <span class="s">"%"</span>, ... },
+    <span class="k">"memory"</span>: { <span class="k">"status"</span>: <span class="n">1</span>, ... },
+    ... (disk, net_recv, net_sent)
+  }
+}</pre>
+    <div class="note">꺼진 서버 예: <code>{ "server":"server-04", "powercode":0, "powerstate":"off", "alertNum":0, "metrics":{} }</code></div>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/metric/{server}/{metric}</span></div>
+    <p class="desc">지표 1개의 현재값 (AR이 단일 숫자 읽기용).</p>
+<pre>{ <span class="k">"server"</span>:<span class="s">"server-01"</span>, <span class="k">"metric"</span>:<span class="s">"cpu"</span>, <span class="k">"value"</span>:<span class="n">79.5</span>, <span class="k">"display"</span>:<span class="s">"79.5%"</span>, <span class="k">"levelCode"</span>:<span class="n">1</span>, <span class="k">"unit"</span>:<span class="s">"%"</span> }</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/alert/{server}</span></div>
+    <p class="desc">서버 종합 심각도 1개 (AR 알림 트리거: value&gt;=2 위험).</p>
+<pre>{ <span class="k">"server"</span>:<span class="s">"server-01"</span>, <span class="k">"value"</span>:<span class="n">1</span>, <span class="k">"level"</span>:<span class="s">"warning"</span>, <span class="k">"levelText"</span>:<span class="s">"보통"</span> }</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/alert/{server}/issues</span>
+      <span class="tag new">신규</span></div>
+    <p class="desc">서버별 <b>이상징후만</b>(보통·위험) 목록. 정상은 제외, 없으면 빈 배열. 최대 5개.</p>
+<pre>{
+  <span class="k">"server"</span>: <span class="s">"server-01"</span>,
+  <span class="k">"updatedAt"</span>: <span class="n">1781257155</span>,
+  <span class="k">"updatedAtText"</span>: <span class="s">"2026-06-12 18:39:15"</span>,
+  <span class="k">"count"</span>: <span class="n">1</span>,
+  <span class="k">"alerts"</span>: [
+    { <span class="k">"metric"</span>:<span class="s">"cpu"</span>, <span class="k">"name"</span>:<span class="s">"CPU 사용률"</span>, <span class="k">"value"</span>:<span class="n">79.5</span>, <span class="k">"display"</span>:<span class="s">"79.5%"</span>,
+      <span class="k">"levelCode"</span>:<span class="n">1</span>, <span class="k">"levelText"</span>:<span class="s">"보통"</span>, <span class="k">"message"</span>:<span class="s">"CPU 사용률 79.5% 보통"</span> }
+  ]
+}</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/alert</span></div>
+    <p class="desc">전체 종합 (가장 심각한 서버 기준).</p>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/history/{server}/{metric}</span></div>
+    <p class="desc">한 서버·한 지표의 시계열 (그래프용). 쿼리: <b>?minutes=60&amp;step=15</b></p>
+<pre>{ <span class="k">"server"</span>:<span class="s">"server-01"</span>, <span class="k">"metric"</span>:<span class="s">"cpu"</span>, <span class="k">"unit"</span>:<span class="s">"%"</span>, <span class="k">"points"</span>: [ [<span class="n">1781257000</span>, <span class="n">51.5</span>], ... ] }</pre>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/history/{metric}</span></div>
+    <p class="desc">한 지표의 <b>모든 서버</b> 추이 (대시보드 멀티라인). 쿼리: <b>?minutes=60&amp;step=15</b></p>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/anomalies</span></div>
+    <p class="desc">이상징후 이력(SQLite). 쿼리: <b>?limit=100&amp;server=&amp;metric=</b></p>
+  </div>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/api/alerts</span></div>
+    <p class="desc">레벨 전환 알림 이력(SQLite). 쿼리: <b>?limit=50&amp;server=</b></p>
+  </div>
+
+  <!-- ── 인증 API ───────────────────────────────────── -->
+  <h2>인증 API <span style="font-size:13px;color:var(--muted);font-weight:400">(로그인 토큰 흐름)</span></h2>
+
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/ · /login/start · /auth/start</span></div>
+    <p class="desc">로그인 진입점. 셋업 안 됐으면 셋업 페이지, 됐으면 로그인 토큰 발급 흐름.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m POST">POST</span><span class="path">/auth/start</span></div>
+    <p class="desc">로그인 토큰 발급 시작.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/setup</span> &nbsp;
+      <span class="m POST">POST</span><span class="path">/setup</span></div>
+    <p class="desc">최초 관리자 계정 셋업 페이지 / 처리.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/login?token={token}</span></div>
+    <p class="desc">토큰으로 로그인 페이지 표시.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m POST">POST</span><span class="path">/auth/login</span></div>
+    <p class="desc">로그인 처리 (body: token). 성공 시 <code>/login/result?token=</code>로 이동.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/login/result?token={token}</span></div>
+    <p class="desc">로그인 결과·승인 대기 페이지. JS가 <code>/auth/current-once</code>를 폴링.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/auth/status/{token}</span></div>
+    <p class="desc">토큰 상태 조회 (경로 파라미터).</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/auth/current?token={token}</span></div>
+    <p class="desc">현재 인증 상태 조회.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/auth/current-once?token={token}</span></div>
+    <p class="desc">1회용 상태 조회 (결과 페이지 폴링용).</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/auth/sessions?limit=</span></div>
+    <p class="desc">세션 목록 조회.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/auth/login-audits?limit=</span></div>
+    <p class="desc">로그인 감사 로그 조회.</p>
+  </div>
+  <div class="api">
+    <div class="top"><span class="m GET">GET</span><span class="path">/admin</span> <span class="tag auth">관리자</span></div>
+    <p class="desc">세션·로그인 감사 모니터 페이지. 미인증 시 <code>/auth/start</code>로 리다이렉트.</p>
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    비활성: <code>/api/chart/{server}/{metric}</code> (차트 이미지 SVG/PNG) — Make&amp;View가 원격 URL 이미지를 못 띄워 주석 처리됨.
+  </div>
+</main>
+
+<footer>
+  VIRNECT 시스템 모니터 · 작성 2026-06-12 · 모든 <code>/api/*</code>는 인증 없이 호출 가능(대시보드 HTML만 보호).
+</footer>
+</body>
+</html>
