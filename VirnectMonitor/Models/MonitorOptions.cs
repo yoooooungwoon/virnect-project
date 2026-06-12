@@ -14,4 +14,7 @@ public sealed class MonitorOptions
 
     /// <summary>서버를 구분하는 라벨 (windows_exporter relabel 결과).</summary>
     public string GroupLabel { get; set; } = "server";
+
+    /// <summary>전체 서버 on/off 판정용 up 메트릭 쿼리 (꺼진 서버도 up=0으로 잡힘).</summary>
+    public string UpQuery { get; set; } = "up{job=\"windows-servers\"}";
 }

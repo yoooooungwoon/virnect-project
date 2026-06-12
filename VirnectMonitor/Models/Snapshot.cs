@@ -12,7 +12,11 @@ public sealed record MetricReading(
     int LevelCode,    // 0 | 1 | 2  (Make&View용)
     string LevelText, // 클린 | 보통 | 위험
     double Warn,
-    double Danger);
+    double Danger)
+{
+    /// <summary>상태 코드: 1=클린, 0=경고, -1=위험 (= 1 - LevelCode).</summary>
+    public int Status => 1 - LevelCode;
+}
 
 /// <summary>서버 1대의 전체 지표 스냅샷.</summary>
 public sealed record ServerSnapshot(

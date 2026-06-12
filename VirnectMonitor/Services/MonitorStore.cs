@@ -10,16 +10,25 @@ public sealed class MonitorStore
     private volatile IReadOnlyDictionary<string, ServerSnapshot> _snapshot =
         new Dictionary<string, ServerSnapshot>();
 
+    // 전체 서버 on/off (server -> 1 켜짐 / 0 꺼짐). up 메트릭 기준이라 꺼진 서버도 포함.
+    private volatile IReadOnlyDictionary<string, int> _serverUp =
+        new Dictionary<string, int>();
+
     // (서버, 지표) → 직전 레벨. 레벨 전환(알림) 감지에 사용.
     private readonly ConcurrentDictionary<(string Server, string Metric), Level> _lastLevel = new();
 
     public IReadOnlyDictionary<string, ServerSnapshot> Snapshot => _snapshot;
+    public IReadOnlyDictionary<string, int> ServerUp => _serverUp;
     public DateTimeOffset? LastUpdated { get; private set; }
     public string? LastError { get; set; }
 
-    public void Update(IReadOnlyDictionary<string, ServerSnapshot> snapshot, DateTimeOffset updatedAt)
+    public void Update(
+        IReadOnlyDictionary<string, ServerSnapshot> snapshot,
+        IReadOnlyDictionary<string, int> serverUp,
+        DateTimeOffset updatedAt)
     {
         _snapshot = snapshot;
+        _serverUp = serverUp;
         LastUpdated = updatedAt;
     }
 

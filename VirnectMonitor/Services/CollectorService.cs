@@ -43,6 +43,14 @@ public sealed class CollectorService(
         var now = DateTimeOffset.UtcNow;
         long createdAt = now.ToUnixTimeSeconds();
 
+        // 0) up 메트릭으로 전체 서버 on/off (꺼진 서버도 up=0으로 포함)
+        var serverUp = new Dictionary<string, int>();
+        foreach (var sample in await prometheus.QueryAsync(options.Value.UpQuery, ct))
+        {
+            var server = ResolveServer(sample.Labels, groupLabel);
+            serverUp[server] = sample.Value >= 0.5 ? 1 : 0;
+        }
+
         // 1) 지표별 쿼리 → server -> (metricId -> value)
         var byServer = new Dictionary<string, Dictionary<string, double>>();
         foreach (var spec in Metrics.All)
@@ -98,8 +106,9 @@ public sealed class CollectorService(
                 server, readings, Metrics.Key(worst), (int)worst, Metrics.Text(worst), createdAt);
         }
 
-        store.Update(snapshot, now);
-        logger.LogInformation("수집 완료: 서버 {Count}대", snapshot.Count);
+        store.Update(snapshot, serverUp, now);
+        logger.LogInformation("수집 완료: 켜진 서버 {On}대 / 전체 {Total}대",
+            serverUp.Count(kv => kv.Value == 1), serverUp.Count);
     }
 
     private static string ResolveServer(IReadOnlyDictionary<string, string> labels, string groupLabel)

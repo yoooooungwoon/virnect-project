@@ -81,6 +81,7 @@ app.MapGet("/api/health", (MonitorStore store, IConfiguration config) => new
 {
     ok = store.LastError is null,
     lastUpdated = store.LastUpdated?.ToUnixTimeSeconds(),
+    lastUpdatedText = store.LastUpdated is { } t ? FormatKst(t.ToUnixTimeSeconds()) : null,  // 수집시각(한국시간 문자열)
     lastError = store.LastError,
     prometheusUrl = config["Monitor:PrometheusUrl"],
     servers = store.Snapshot.Keys.OrderBy(x => x),
@@ -97,14 +98,35 @@ app.MapGet("/api/metrics", () => new
 app.MapGet("/api/status", (MonitorStore store) => new
 {
     ts = store.LastUpdated?.ToUnixTimeSeconds(),
+    tsText = store.LastUpdated is { } t ? FormatKst(t.ToUnixTimeSeconds()) : null,  // 수집시각(한국시간 문자열)
     servers = store.Snapshot,
 });
 
-// 서버 1대 현재 상태
+
+// 서버 1대 현재 상태 — 전원(on/off) + 알림수 + 지표. 꺼진 서버도 powercode:0으로 응답.
+//  powercode 1=켜짐 0=꺼짐, powerstate "on"/"off", alertNum 이상징후 개수
+//  각 지표 status: 1=클린 0=경고 -1=위험
 app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
-    store.Snapshot.TryGetValue(server, out var s)
-        ? Results.Ok(s)
-        : Results.NotFound(new { error = "서버 없음", server }));
+{
+    if (!store.ServerUp.TryGetValue(server, out var up))
+        return Results.NotFound(new { error = "서버 없음", server });
+
+    var on = up == 1;
+    store.Snapshot.TryGetValue(server, out var s);
+    var alertNum = s is null ? 0 : s.Metrics.Values.Count(m => m.LevelCode >= 1);
+    long? updated = s?.UpdatedAt ?? store.LastUpdated?.ToUnixTimeSeconds();
+
+    return Results.Ok(new
+    {
+        server,
+        powercode = on ? 1 : 0,
+        powerstate = on ? "on" : "off",
+        alertNum,
+        updatedAt = updated,
+        updatedAtText = updated is { } u ? FormatKst(u) : null,
+        metrics = s?.Metrics ?? new Dictionary<string, MetricReading>(),
+    });
+});
 
 // --- Make&View 친화: 단일 숫자값 ------------------------------------
 // 지표 1개의 현재값 (AR이 value 읽어 표시)
@@ -124,6 +146,40 @@ app.MapGet("/api/alert/{server}", (string server, MonitorStore store) =>
     store.Snapshot.TryGetValue(server, out var s)
         ? Results.Ok(new { server, value = s.OverallCode, level = s.Overall, levelText = s.OverallText })
         : Results.NotFound(new { error = "서버 없음", server }));
+
+// 서버별 이상징후 알림 목록 (보통·위험만, 정상 제외, 최대 5개) — AR 알림 표시용
+app.MapGet("/api/alert/{server}/issues", (string server, MonitorStore store) =>
+{
+    if (!store.Snapshot.TryGetValue(server, out var s))
+        return Results.NotFound(new { error = "서버 없음", server });
+
+    var alerts = s.Metrics.Values
+        .Where(m => m.LevelCode >= 1)               // 클린(0) 제외, 보통(1)·위험(2)만
+        .OrderByDescending(m => m.LevelCode)        // 위험 먼저
+        .ThenBy(m => m.Id)
+        .Select(m => new
+        {
+            metric = m.Id,
+            name = m.Name,
+            value = m.Value,
+            display = m.Display,
+            level = m.Level,
+            levelCode = m.LevelCode,
+            levelText = m.LevelText,
+            unit = m.Unit,
+            message = $"{m.Name} {m.Display} {m.LevelText}",
+        })
+        .ToList();
+
+    return Results.Ok(new
+    {
+        server,
+        updatedAt = s.UpdatedAt,
+        updatedAtText = FormatKst(s.UpdatedAt),  // 수집시각(한국시간 문자열)
+        count = alerts.Count,
+        alerts,
+    });
+});
 
 // 전체 종합(가장 심각한 서버 기준)
 app.MapGet("/api/alert", (MonitorStore store) =>
@@ -227,3 +283,9 @@ static bool IsDashboardStaticPath(PathString path)
     return path.Equals("/index.html", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/server.html", StringComparison.OrdinalIgnoreCase);
 }
+
+// Unix초(UTC) → 한국시간 'yyyy-MM-dd HH:mm:ss' 문자열
+static string FormatKst(long unixSeconds) =>
+    DateTimeOffset.FromUnixTimeSeconds(unixSeconds)
+        .ToOffset(TimeSpan.FromHours(9))
+        .ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
