@@ -176,9 +176,9 @@ async function loadStatus(){
   }
 }
 function renderTabs(names){
-  $("serverTabs").innerHTML = names.map(name =>
-    `<button class="server-tab ${activeTab==="server" && name===selectedServer?"active":""}" data-server="${name}">${name}</button>`).join("")
-    + `<button class="server-tab ${activeTab==="all"?"active":""}" data-tab="${ALL_GRAPHS_TAB}">&#51204;&#52404; &#44536;&#47000;&#54532;</button>`;
+  $("serverTabs").innerHTML = `<button class="server-tab ${activeTab==="all"?"active":""}" data-tab="${ALL_GRAPHS_TAB}">&#51204;&#52404; &#44536;&#47000;&#54532;</button>`
+    + names.map(name =>
+    `<button class="server-tab ${activeTab==="server" && name===selectedServer?"active":""}" data-server="${name}">${name}</button>`).join("");
   document.querySelectorAll(".server-tab[data-server]").forEach(btn => btn.onclick = async () => {
     activeTab = "server";
     selectedServer = btn.dataset.server;
