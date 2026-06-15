@@ -251,8 +251,6 @@ Make&View에서는 아래 표의 `JSON 필드`를 응답 필터로 연결하면 
 | 화면/기능 | API | JSON 필드 | 타입 | 값 예시 | Make&View 연결 용도 |
 |---|---|---|---|---|---|
 | 로그인 확인 | `GET /auth/current-once?token={token}` | `value` | number | `1` | `1`이면 인증 성공 |
-| 로그인 확인 | `GET /auth/current-once?token={token}` | `status` | string | `approved` | 인증 상태 표시 |
-| 로그인 확인 | `GET /auth/current-once?token={token}` | `authenticated` | boolean | `true` | 인증 여부 확인 |
 | 장비 요약 | `GET /api/server/server-01` | `powercode` | number | `1` | `1=on`, `0=off` |
 | 장비 요약 | `GET /api/server/server-01` | `alertNum` | number | `2` | 보통/위험 항목 개수 |
 | 장비 요약 | `GET /api/server/server-01` | `operationCode` | number | `3` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
