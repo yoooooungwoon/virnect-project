@@ -103,10 +103,32 @@ app.MapGet("/api/status", (MonitorStore store) => new
 });
 
 
-// 서버 1대 현재 상태 — 전원(on/off) + 알림수 + 지표. 꺼진 서버도 powercode:0으로 응답.
-//  powercode 1=켜짐 0=꺼짐, powerstate "on"/"off", alertNum 이상징후 개수
-//  각 지표 status: 1=클린 0=경고 -1=위험
+// 서버 1대 장비요약 — Make&View 연결용으로 필요한 값만 응답. 꺼진 서버도 powercode:0으로 응답.
+//  powercode 1=켜짐 0=꺼짐, operationCode 0=전원OFF 1=클린 2=경고 3=위험, alertNum 이상징후 개수
 app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
+{
+    if (!store.ServerUp.TryGetValue(server, out var up))
+        return Results.NotFound(new { error = "서버 없음", server });
+
+    var on = up == 1;
+    store.Snapshot.TryGetValue(server, out var s);
+    var alertNum = s is null ? 0 : s.Metrics.Values.Count(m => m.LevelCode >= 1);
+    var operationCode = ResolveOperationCode(on, s);
+    var checkMessage = BuildCheckMessage(on, s);
+
+    return Results.Ok(new
+    {
+        server,
+        powercode = on ? 1 : 0,
+        operationCode,
+        checkMessage,
+        alertNum,
+    });
+});
+
+// 서버 1대 상세 상태 — 웹 대시보드/상세 모니터링용.
+//  각 지표 status: 1=클린 0=경고 -1=위험
+app.MapGet("/api/server/{server}/metrics", (string server, MonitorStore store) =>
 {
     if (!store.ServerUp.TryGetValue(server, out var up))
         return Results.NotFound(new { error = "서버 없음", server });
@@ -120,7 +142,8 @@ app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
     {
         server,
         powercode = on ? 1 : 0,
-        powerstate = on ? "on" : "off",
+        operationCode = ResolveOperationCode(on, s),
+        checkMessage = BuildCheckMessage(on, s),
         alertNum,
         updatedAt = updated,
         updatedAtText = updated is { } u ? FormatKst(u) : null,
@@ -129,16 +152,29 @@ app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
 });
 
 // --- Make&View 친화: 단일 숫자값 ------------------------------------
-// 지표 1개의 현재값 (AR이 value 읽어 표시)
+// 지표 1개의 현재값 (Make&View가 powercode, display, levelCode만 연결)
+//  levelCode 0=전원OFF 1=클린 2=경고 3=위험
 app.MapGet("/api/metric/{server}/{metric}", (string server, string metric, MonitorStore store) =>
 {
+    if (!Metrics.ById.ContainsKey(metric))
+        return Results.NotFound(new { error = "지표 없음", metric });
+
+    if (!store.ServerUp.TryGetValue(server, out var up))
+        return Results.NotFound(new { error = "서버 없음", server });
+
+    var powercode = up == 1 ? 1 : 0;
+    if (powercode == 0)
+        return Results.Ok(new { powercode, display = "전원 OFF", levelCode = 0 });
+
     if (store.Snapshot.TryGetValue(server, out var s) && s.Metrics.TryGetValue(metric, out var m))
         return Results.Ok(new
         {
-            server, metric, name = m.Name, value = m.Value, display = m.Display,
-            level = m.Level, levelCode = m.LevelCode, levelText = m.LevelText, unit = m.Unit,
+            powercode,
+            display = m.Display,
+            levelCode = m.LevelCode + 1,
         });
-    return Results.NotFound(new { error = "데이터 없음", server, metric });
+
+    return Results.Ok(new { powercode, display = "데이터 없음", levelCode = 2 });
 });
 
 // 서버 종합 심각도 숫자 (AR 알림 트리거: {값}>=2 → 위험)
@@ -289,3 +325,44 @@ static string FormatKst(long unixSeconds) =>
     DateTimeOffset.FromUnixTimeSeconds(unixSeconds)
         .ToOffset(TimeSpan.FromHours(9))
         .ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+
+static int ResolveOperationCode(bool powerOn, ServerSnapshot? snapshot)
+{
+    if (!powerOn)
+        return 0;
+
+    if (snapshot is null || snapshot.Metrics.Count == 0)
+        return 2;
+
+    return snapshot.OverallCode switch
+    {
+        >= 2 => 3,
+        1 => 2,
+        _ => 1,
+    };
+}
+
+static string BuildCheckMessage(bool powerOn, ServerSnapshot? snapshot)
+{
+    if (!powerOn)
+        return "전원 상태 확인 필요";
+
+    if (snapshot is null || snapshot.Metrics.Count == 0)
+        return "수집 데이터 확인 필요";
+
+    var alerts = snapshot.Metrics.Values
+        .Where(m => m.LevelCode >= 1)
+        .OrderByDescending(m => m.LevelCode)
+        .ThenBy(m => m.Id)
+        .Select(m => m.Name)
+        .ToList();
+
+    if (alerts.Count == 0)
+        return "모든 지표 정상";
+
+    var visible = alerts.Take(3).ToList();
+    var prefix = string.Join(", ", visible);
+    return alerts.Count > visible.Count
+        ? $"{prefix}, 외 {alerts.Count - visible.Count}개 확인 필요"
+        : $"{prefix} 확인 필요";
+}

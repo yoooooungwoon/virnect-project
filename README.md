@@ -30,7 +30,7 @@ flowchart LR
   QR["QR 스캔<br/>VIRNECT 앱"] --> LOGIN["로그인<br/>URL 이동"]
   LOGIN --> POS["서버 위치<br/>AR 화면"]
 
-  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>상태: 클린/보통/위험<br/>알림수: 위험 항목 수"]
+  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>운영상태: 전원OFF/클린/경고/위험<br/>알림수: 위험 항목 수"]
 
   POS <--> MONITOR["서버 1, 2, 3, 4<br/>모니터링"]
   MONITOR <--> ALERT["알림<br/>보통/위험 항목 표시"]
@@ -130,7 +130,16 @@ flowchart LR
 | 보통 | `warning` | `1` | warn 이상, danger 미만 |
 | 위험 | `danger` | `2` | danger 이상 |
 
-`/api/server/{server}`의 지표별 `status` 값은 Make&View 조건 연결을 위해 `1 - levelCode`로 계산됩니다.
+단, Make&View에서 바로 연결하는 `/api/server/{server}`와 `/api/metric/{server}/{metric}`의 운영/상태 코드는 전원 OFF까지 포함해 아래처럼 사용합니다.
+
+| 코드 | 의미 |
+|---:|---|
+| `0` | 전원OFF |
+| `1` | 클린 |
+| `2` | 경고 |
+| `3` | 위험 |
+
+`/api/server/{server}/metrics`의 지표별 `status` 값은 Make&View 조건 연결을 위해 `1 - levelCode`로 계산됩니다.
 
 | status | 의미 |
 |---:|---|
@@ -146,8 +155,6 @@ flowchart LR
 |---|---:|---|
 | `powercode` | `1` | 서버 켜짐 |
 | `powercode` | `0` | 서버 꺼짐 |
-| `powerstate` | `on` | 서버 켜짐 |
-| `powerstate` | `off` | 서버 꺼짐 |
 
 ### 인증
 
@@ -225,7 +232,8 @@ Base URL은 실행 환경에 따라 달라집니다.
 | 헬스체크 | GET | `/api/health` | 수집 상태, Prometheus 주소, 서버 목록 |
 | 지표 정의 | GET | `/api/metrics` | 지표 이름, 단위, 임계치 |
 | 전체 상태 | GET | `/api/status` | 모든 서버 현재 스냅샷 |
-| 서버 상태 | GET | `/api/server/{server}` | 전원 상태, 알림 수, 지표 목록 |
+| 장비 요약 | GET | `/api/server/{server}` | Make&View 장비요약용 짧은 JSON |
+| 서버 상세 지표 | GET | `/api/server/{server}/metrics` | 선택/디버깅용 전원 상태, 알림 수, 지표 목록 |
 | 지표 현재값 | GET | `/api/metric/{server}/{metric}` | 특정 서버의 특정 지표값 |
 | 서버 위험도 | GET | `/api/alert/{server}` | 서버 종합 위험도 |
 | 서버 이상징후 | GET | `/api/alert/{server}/issues` | 보통/위험 지표 목록 |
@@ -245,17 +253,15 @@ Make&View에서는 아래 표의 `JSON 필드`를 응답 필터로 연결하면 
 | 로그인 확인 | `GET /auth/current-once?token={token}` | `status` | string | `approved` | 인증 상태 표시 |
 | 로그인 확인 | `GET /auth/current-once?token={token}` | `authenticated` | boolean | `true` | 인증 여부 확인 |
 | 장비 요약 | `GET /api/server/server-01` | `powercode` | number | `1` | `1=on`, `0=off` |
-| 장비 요약 | `GET /api/server/server-01` | `powerstate` | string | `on` | 전원 상태 텍스트 |
 | 장비 요약 | `GET /api/server/server-01` | `alertNum` | number | `2` | 보통/위험 항목 개수 |
-| 장비 요약 | `GET /api/server/server-01` | `updatedAtText` | string | `2026-06-14 14:39:15` | 마지막 갱신 시간 |
-| 서버 위험도 | `GET /api/alert/server-01` | `value` | number | `2` | `0=클린`, `1=보통`, `2=위험` |
-| 서버 위험도 | `GET /api/alert/server-01` | `level` | string | `danger` | 상태 키 |
-| 서버 위험도 | `GET /api/alert/server-01` | `levelText` | string | `위험` | 상태 표시 텍스트 |
-| 지표 수치 | `GET /api/metric/server-01/cpu` | `value` | number | `83.2` | 수치 표시/조건 연결 |
+| 장비 요약 | `GET /api/server/server-01` | `operationCode` | number | `3` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
+| 장비 요약 | `GET /api/server/server-01` | `checkMessage` | string | `CPU 사용률, 디스크 사용률 확인 필요` | 확인 필요 한 줄 요약 |
+| 서버 위험도 | `GET /api/alert/server-01` | `value` | number | `2` | 보조 조회: `0=클린`, `1=보통`, `2=위험` |
+| 서버 위험도 | `GET /api/alert/server-01` | `level` | string | `danger` | 보조 조회 상태 키 |
+| 서버 위험도 | `GET /api/alert/server-01` | `levelText` | string | `위험` | 보조 조회 상태 표시 텍스트 |
+| 지표 수치 | `GET /api/metric/server-01/cpu` | `powercode` | number | `1` | `1=on`, `0=off` |
 | 지표 수치 | `GET /api/metric/server-01/cpu` | `display` | string | `83.2%` | 화면 텍스트 표시 |
-| 지표 수치 | `GET /api/metric/server-01/cpu` | `levelCode` | number | `1` | `0=클린`, `1=보통`, `2=위험` |
-| 지표 수치 | `GET /api/metric/server-01/cpu` | `levelText` | string | `보통` | 지표 상태 텍스트 |
-| 지표 수치 | `GET /api/metric/server-01/cpu` | `unit` | string | `%` | 단위 표시 |
+| 지표 수치 | `GET /api/metric/server-01/cpu` | `levelCode` | number | `2` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `count` | number | `2` | 알림 개수 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].message` | string | `CPU 사용률 83.2% 보통` | 알림 문구 표시 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].metric` | string | `cpu` | 어떤 지표인지 구분 |
@@ -270,20 +276,69 @@ Make&View에서 자주 쓰는 조건 예시는 다음과 같습니다.
 | 서버 전원 ON 표시 | `/api/server/server-01` | `powercode` | `{값} == 1` |
 | 서버 전원 OFF 표시 | `/api/server/server-01` | `powercode` | `{값} == 0` |
 | 알림 있음 표시 | `/api/server/server-01` | `alertNum` | `{값} > 0` |
-| 서버 위험 상태 표시 | `/api/alert/server-01` | `value` | `{값} >= 2` |
-| 특정 지표 위험 표시 | `/api/metric/server-01/cpu` | `levelCode` | `{값} >= 2` |
-| 특정 지표 수치 표시 | `/api/metric/server-01/cpu` | `value` | 텍스트/숫자 표시 |
+| 장비 운영상태 경고 이상 표시 | `/api/server/server-01` | `operationCode` | `{값} >= 2` |
+| 장비 운영상태 위험 표시 | `/api/server/server-01` | `operationCode` | `{값} >= 3` |
+| 확인 필요 문구 표시 | `/api/server/server-01` | `checkMessage` | 텍스트 표시 |
+| 서버 위험 상태 보조 조회 | `/api/alert/server-01` | `value` | `{값} >= 2` |
+| 특정 지표 경고 이상 표시 | `/api/metric/server-01/cpu` | `levelCode` | `{값} >= 2` |
+| 특정 지표 위험 표시 | `/api/metric/server-01/cpu` | `levelCode` | `{값} >= 3` |
+| 특정 지표 수치 표시 | `/api/metric/server-01/cpu` | `display` | 텍스트 표시 |
 
-### 모니터링 대시보드 JSON 필드
+Make&View 화면별 추천 연결은 다음과 같습니다.
 
-웹 대시보드와 그래프 화면에서 주로 사용하는 JSON 필드는 다음과 같습니다.
+| 화면 | API | 사용할 필드 |
+|---|---|---|
+| 장비요약 | `/api/server/server-01` | `powercode`, `operationCode`, `checkMessage`, `alertNum` |
+| CPU | `/api/metric/server-01/cpu` | `powercode`, `display`, `levelCode` |
+| 메모리 | `/api/metric/server-01/memory` | `powercode`, `display`, `levelCode` |
+| 디스크 | `/api/metric/server-01/disk` | `powercode`, `display`, `levelCode` |
+| 네트워크 수신 | `/api/metric/server-01/net_recv` | `powercode`, `display`, `levelCode` |
+| 네트워크 송신 | `/api/metric/server-01/net_sent` | `powercode`, `display`, `levelCode` |
+
+최종 Make&View 연결용 JSON 예시는 다음과 같습니다.
+
+```json
+GET /api/server/server-01
+
+{
+  "server": "server-01",
+  "powercode": 1,
+  "operationCode": 3,
+  "checkMessage": "CPU 사용률, 디스크 사용률 확인 필요",
+  "alertNum": 2
+}
+```
+
+```json
+GET /api/metric/server-01/cpu
+
+{
+  "powercode": 1,
+  "display": "83.2%",
+  "levelCode": 2
+}
+```
+
+전원이 꺼진 서버의 지표 API는 다음처럼 응답합니다.
+
+```json
+{
+  "powercode": 0,
+  "display": "전원 OFF",
+  "levelCode": 0
+}
+```
+
+### 선택/디버깅용 JSON 필드
+
+현재 Make&View 프론트에서는 필수로 쓰지 않지만, 브라우저 확인이나 디버깅에 사용할 수 있는 JSON 필드는 다음과 같습니다.
 
 | 기능 | API | 주요 JSON 필드 | 설명 |
 |---|---|---|---|
 | 전체 상태 | `GET /api/status` | `ts`, `tsText`, `servers` | 전체 서버 현재 상태 |
 | 전체 상태 | `GET /api/status` | `servers.server-01.metrics.cpu.value` | 특정 서버 CPU 현재값 |
 | 전체 상태 | `GET /api/status` | `servers.server-01.overallCode` | 서버 종합 상태 코드 |
-| 서버 상세 | `GET /api/server/server-01` | `powercode`, `powerstate`, `alertNum`, `metrics` | 서버 상세 카드 데이터 |
+| 서버 상세 | `GET /api/server/server-01/metrics` | `powercode`, `operationCode`, `checkMessage`, `alertNum`, `updatedAt`, `metrics` | 서버 상세 카드 데이터 |
 | 서버별 그래프 | `GET /api/history/server-01/cpu?minutes=60&step=15` | `points` | `[unix초, 값]` 배열 |
 | 전체 그래프 | `GET /api/history/cpu?minutes=60&step=15` | `series[].server`, `series[].points` | 서버별 멀티라인 그래프 |
 | 이상징후 이력 | `GET /api/anomalies?limit=100` | `id`, `server`, `metric`, `value`, `level`, `createdAt` | 보통/위험 기록 |
