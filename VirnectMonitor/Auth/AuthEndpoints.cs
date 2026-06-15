@@ -734,6 +734,12 @@ public static class AuthEndpoints
             return Results.Ok(await auth.CurrentOnceAsync(token));
         });
 
+        app.MapPost("/auth/logout", async (AuthService auth, HttpRequest request, string? token) =>
+        {
+            var logout = await ReadLogoutRequestAsync(request, token);
+            return Results.Ok(await auth.LogoutAsync(logout));
+        });
+
         app.MapGet("/auth/sessions", async (AuthService auth, int? limit) =>
         {
             if (!await auth.HasActiveApprovedSessionAsync())
@@ -798,6 +804,125 @@ public static class AuthEndpoints
         }
 
         return login;
+    }
+
+    private static async Task<LogoutRequest> ReadLogoutRequestAsync(HttpRequest request, string? queryToken)
+    {
+        if (request.HasFormContentType)
+        {
+            var form = await request.ReadFormAsync();
+            var token = FirstNonEmpty(form["token"].ToString(), queryToken);
+            var command = FirstNonEmpty(form["command"].ToString(), form["value"].ToString()) ?? "";
+            return new LogoutRequest(token, ParseLogoutCommand(command));
+        }
+
+        if (request.ContentLength is 0)
+        {
+            return new LogoutRequest(queryToken, "");
+        }
+
+        if (!IsJsonRequest(request))
+        {
+            using var reader = new StreamReader(request.Body);
+            return ParseRawLogoutRequest(await reader.ReadToEndAsync(), queryToken);
+        }
+
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(request.Body);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var token = queryToken;
+                if (root.TryGetProperty("token", out var tokenElement)
+                    && tokenElement.ValueKind == JsonValueKind.String)
+                {
+                    token = FirstNonEmpty(tokenElement.GetString(), queryToken);
+                }
+
+                var command = TryReadLogoutCommand(root, out var logoutCommand) ? logoutCommand : "";
+
+                return new LogoutRequest(token, command);
+            }
+
+            return new LogoutRequest(queryToken, ParseLogoutCommand(root));
+        }
+        catch (JsonException)
+        {
+            return new LogoutRequest(queryToken, "");
+        }
+    }
+
+    private static bool TryReadLogoutCommand(JsonElement root, out string command)
+    {
+        foreach (var propertyName in new[] { "command", "action", "value" })
+        {
+            if (root.TryGetProperty(propertyName, out var element))
+            {
+                command = ParseLogoutCommand(element);
+                return true;
+            }
+        }
+
+        command = "";
+        return false;
+    }
+
+    private static LogoutRequest ParseRawLogoutRequest(string raw, string? queryToken)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var token = queryToken;
+                if (root.TryGetProperty("token", out var tokenElement)
+                    && tokenElement.ValueKind == JsonValueKind.String)
+                {
+                    token = FirstNonEmpty(tokenElement.GetString(), queryToken);
+                }
+
+                var command = TryReadLogoutCommand(root, out var logoutCommand) ? logoutCommand : "";
+                return new LogoutRequest(token, command);
+            }
+
+            return new LogoutRequest(queryToken, ParseLogoutCommand(root));
+        }
+        catch (JsonException)
+        {
+            return new LogoutRequest(queryToken, ParseLogoutCommand(raw));
+        }
+    }
+
+    private static bool IsJsonRequest(HttpRequest request)
+    {
+        var contentType = request.ContentType;
+        return contentType is not null
+            && contentType.Contains("json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? FirstNonEmpty(string? primary, string? fallback)
+    {
+        return string.IsNullOrWhiteSpace(primary) ? fallback : primary;
+    }
+
+    private static string ParseLogoutCommand(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => ParseLogoutCommand(element.GetString()),
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => "true",
+            _ => ""
+        };
+    }
+
+    private static string ParseLogoutCommand(string? raw)
+    {
+        return raw?.Trim() ?? "";
     }
 
     private static LoginAttemptMetadata ReadLoginAttemptMetadata(HttpRequest request)

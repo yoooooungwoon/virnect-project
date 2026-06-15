@@ -12,6 +12,15 @@ public sealed record LoginRequest(
     string Username,
     string Password);
 
+public sealed record LogoutRequest(
+    string? Token,
+    string Command);
+
+public sealed record LogoutResponse(
+    string Status,
+    int Value,
+    bool LoggedOut);
+
 public sealed record LoginAttemptMetadata(
     string? ClientIp,
     string? UserAgent);

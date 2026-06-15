@@ -10,7 +10,7 @@ public sealed class AuthOptions
 
     public int LoginExpiresMinutes { get; set; } = 10;
 
-    public int AuthDurationMinutes { get; set; } = 5;
+    public int AuthDurationMinutes { get; set; } = 30;
 
     public int MaxFailureCount { get; set; } = 5;
 

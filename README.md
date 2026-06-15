@@ -223,6 +223,7 @@ Base URL은 실행 환경에 따라 달라집니다.
 | 토큰 상태 조회 | GET | `/auth/status/{token}` | 특정 토큰 상태 확인 |
 | 현재 인증 조회 | GET | `/auth/current?token={token}` | 현재 인증 상태 확인 |
 | Make&View 인증 확인 | GET | `/auth/current-once?token={token}` | 인증 여부를 `value`로 반환 |
+| Make&View 로그아웃 신청 | POST | `/auth/logout?token={token}` | 문자열 `logout`을 보내 승인 세션을 로그아웃 처리 |
 | 세션 목록 | GET | `/auth/sessions?limit=20` | 최근 인증 세션 목록 |
 | 로그인 감사 목록 | GET | `/auth/login-audits?limit=20` | 최근 로그인 시도 목록 |
 
@@ -246,11 +247,13 @@ Base URL은 실행 환경에 따라 달라집니다.
 
 ### Make&View 연결용 JSON 필드
 
-Make&View에서는 아래 표의 `JSON 필드`를 응답 필터로 연결하면 됩니다.
+Make&View에서는 아래 표의 `JSON 필드`를 요청 body 또는 응답 필터로 연결하면 됩니다.
 
 | 화면/기능 | API | JSON 필드 | 타입 | 값 예시 | Make&View 연결 용도 |
 |---|---|---|---|---|---|
 | 로그인 확인 | `GET /auth/current-once?token={token}` | `value` | number | `1` | `1`이면 인증 성공 |
+| 로그아웃 신청 | `POST /auth/logout?token={token}` | `command` | string | `logout` | 요청 body로 전송 |
+| 로그아웃 결과 | `POST /auth/logout?token={token}` | `value` | number | `1` | `1`이면 로그아웃 처리됨 |
 | 장비 요약 | `GET /api/server/server-01` | `powercode` | number | `1` | `1=on`, `0=off` |
 | 장비 요약 | `GET /api/server/server-01` | `alertNum` | number | `2` | 보통/위험 항목 개수 |
 | 장비 요약 | `GET /api/server/server-01` | `operationCode` | number | `3` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
@@ -272,6 +275,7 @@ Make&View에서 자주 쓰는 조건 예시는 다음과 같습니다.
 | 목적 | API | 필드 | 조건 |
 |---|---|---|---|
 | 로그인 성공 시 다음 화면 이동 | `/auth/current-once?token={token}` | `value` | `{값} > 0` |
+| 로그아웃 처리 완료 확인 | `/auth/logout?token={token}` | `value` | `{값} > 0` |
 | 서버 전원 ON 표시 | `/api/server/server-01` | `powercode` | `{값} == 1` |
 | 서버 전원 OFF 표시 | `/api/server/server-01` | `powercode` | `{값} == 0` |
 | 알림 있음 표시 | `/api/server/server-01` | `alertNum` | `{값} > 0` |
@@ -318,6 +322,44 @@ GET /api/metric/server-01/cpu
   "levelCode": 2
 }
 ```
+
+```json
+POST /auth/logout?token={token}
+
+{
+  "command": "logout"
+}
+```
+
+Make&View 로그아웃 버튼에서 보낼 파라미터는 다음처럼 잡습니다.
+
+| 위치 | key | value | 필수 | 설명 |
+|---|---|---|---|---|
+| Query String | `token` | 로그인 토큰 문자열 | 권장 | 어떤 로그인 세션을 로그아웃할지 지정 |
+| Body JSON | `command` | `logout` | 필수 | 로그아웃 신청 명령 |
+
+토큰을 query string으로 붙이기 어렵다면 body에 같이 넣어도 됩니다.
+
+```json
+{
+  "token": "{token}",
+  "command": "logout"
+}
+```
+
+호환용으로 body key는 `value` 또는 `action`도 받을 수 있지만, Make&View에서는 `command: logout`으로 통일하는 것을 권장합니다.
+
+로그아웃 처리 성공 응답은 다음과 같습니다.
+
+```json
+{
+  "status": "revoked",
+  "value": 1,
+  "loggedOut": true
+}
+```
+
+`token`을 함께 보내는 구성이 가장 명확합니다. 현재 설정의 `EnableLatestApprovedCompatMode`가 `true`이면 토큰을 생략하고 `/auth/logout`으로 호출해도 최신 승인 세션을 로그아웃 처리합니다.
 
 전원이 꺼진 서버의 지표 API는 다음처럼 응답합니다.
 
@@ -372,7 +414,7 @@ Docker Compose는 Prometheus가 이미 만든 외부 네트워크 `prometheus_de
 | `Auth:DatabasePath` | `Data/auth.db` | 인증 SQLite DB 경로 |
 | `Auth:ServerSecret` | `development-only-change-me` | 토큰 해시용 비밀값 |
 | `Auth:LoginExpiresMinutes` | `10` | 로그인 토큰 유효 시간 |
-| `Auth:AuthDurationMinutes` | `5` | 인증 유지 시간 |
+| `Auth:AuthDurationMinutes` | `30` | 인증 유지 시간 |
 | `Auth:MaxFailureCount` | `5` | 로그인 실패 허용 횟수 |
 
 운영 환경에서는 반드시 `Auth:ServerSecret`을 안전한 값으로 변경해야 합니다.

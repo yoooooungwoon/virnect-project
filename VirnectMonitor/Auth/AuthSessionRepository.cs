@@ -243,6 +243,30 @@ public sealed class AuthSessionRepository
             });
     }
 
+    public async Task<int> RevokeSessionAsync(long id, long now)
+    {
+        await using var connection = await OpenConnectionAsync();
+        return await ExecuteAsync(
+            connection,
+            null,
+            """
+            UPDATE auth_sessions
+            SET status = @revoked,
+                revoked_at = @now,
+                last_checked_at = @now
+            WHERE id = @id
+              AND status IN (@pending, @approved);
+            """,
+            command =>
+            {
+                AddParameter(command, "@revoked", AuthStatuses.Revoked);
+                AddParameter(command, "@now", now);
+                AddParameter(command, "@id", id);
+                AddParameter(command, "@pending", AuthStatuses.Pending);
+                AddParameter(command, "@approved", AuthStatuses.Approved);
+            });
+    }
+
     public async Task ApproveAsync(long id, string username, long now, long authExpiresAt)
     {
         await using var connection = await OpenConnectionAsync();

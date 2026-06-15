@@ -249,6 +249,43 @@ public sealed class AuthService
             Username: session.Username);
     }
 
+    public async Task<LogoutResponse> LogoutAsync(LogoutRequest request)
+    {
+        if (!IsLogoutCommand(request.Command))
+        {
+            return new LogoutResponse("ignored", 0, LoggedOut: false);
+        }
+
+        var now = NowSeconds();
+        var session = await FindCurrentSessionAsync(request.Token);
+
+        if (session is null)
+        {
+            return new LogoutResponse(AuthStatuses.NotFound, 0, LoggedOut: false);
+        }
+
+        if (IsExpired(session, now))
+        {
+            await _sessions.MarkExpiredAsync(session.Id, now);
+            return new LogoutResponse(AuthStatuses.Expired, 0, LoggedOut: false);
+        }
+
+        if (session.Status is not (AuthStatuses.Pending or AuthStatuses.Approved))
+        {
+            return new LogoutResponse(session.Status, 0, LoggedOut: false);
+        }
+
+        var changed = await _sessions.RevokeSessionAsync(session.Id, now);
+        return changed > 0
+            ? new LogoutResponse(AuthStatuses.Revoked, 1, LoggedOut: true)
+            : new LogoutResponse(session.Status, 0, LoggedOut: false);
+    }
+
+    private static bool IsLogoutCommand(string? command)
+    {
+        return string.Equals(command?.Trim(), "logout", StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<bool> HasActiveApprovedSessionAsync()
     {
         var now = NowSeconds();
