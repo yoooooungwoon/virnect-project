@@ -25,7 +25,7 @@
   .alert-item{border-left:4px solid var(--red);background:#fff5f5;border-radius:6px;padding:10px 12px;font-size:14px;font-weight:700;color:#85182a}
   .alert-empty{color:var(--muted);font-size:14px}
   .hidden{display:none!important}
-  .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
+  .metric-grid{display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));gap:12px}
   .metric-card{min-height:118px;background:#ffffff;border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
   .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800}
   .metric-card .value{font-size:25px;font-weight:800;line-height:1.1;color:#111;white-space:nowrap}
@@ -93,6 +93,7 @@ const METRICS = [
   {id:"cpu", label:"CPU 사용률"},
   {id:"memory", label:"메모리 사용률"},
   {id:"disk", label:"디스크 사용률(C:)"},
+  {id:"disk_io", label:"디스크 I/O"},
   {id:"net_recv", label:"네트워크 수신량"},
   {id:"net_sent", label:"네트워크 송신량"}
 ];
@@ -100,6 +101,7 @@ const AXES = {
   cpu: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
   memory: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
   disk: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  disk_io: {max:120000000, ticks:[0,30000000,60000000,90000000,120000000], labels:["0","30M","60M","90M","120M"]},
   net_recv: {max:720000, ticks:[0,180000,360000,540000,720000], labels:["0k","180k","360k","540k","720k"]},
   net_sent: {max:158000, ticks:[0,39000,79000,118000,158000], labels:["0k","39k","79k","118k","158k"]}
 };
@@ -107,6 +109,7 @@ const THRESHOLDS = {
   cpu: {warning:85, danger:95},
   memory: {warning:85, danger:95},
   disk: {warning:90, danger:95},
+  disk_io: {warning:50000000, danger:100000000},
   net_recv: {warning:612000, danger:684000},
   net_sent: {warning:134300, danger:150100}
 };

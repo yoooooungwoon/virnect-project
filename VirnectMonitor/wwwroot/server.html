@@ -6,7 +6,7 @@
 <title>서버 시스템 모니터</title>
 <style>
   :root{
-    --blue:#27349b;--red:#ff3928;--mint:#b7d7ce;--sky:#79aeca;--lime:#bfd458;
+    --blue:#27349b;--red:#ff3928;--mint:#b7d7ce;--sky:#79aeca;--lime:#bfd458;--teal:#00897b;
     --ink:#18203a;--muted:#7f8797;--page:#f7f8fb;--panel:#fff;--line:#e6e8ef;
   }
   *{box-sizing:border-box}
@@ -19,7 +19,7 @@
   .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
   .section-title{margin:0;color:var(--blue);font-size:18px;font-weight:800}
   select{height:34px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:0 10px;font-size:13px}
-  .metric-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px}
+  .metric-grid{display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));gap:12px}
   .metric-card{min-height:118px;background:var(--panel);border:3px solid currentColor;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
   .metric-card h2{margin:0;font-size:16px;line-height:1.2;color:currentColor;font-weight:800}
   .metric-card .value{font-size:25px;font-weight:800;line-height:1.1;color:#111;white-space:nowrap}
@@ -27,7 +27,7 @@
   .metric-card .sub{color:var(--muted);font-size:12px;margin-top:4px;text-align:left}
   .metric-card .level{align-self:flex-start;border-radius:999px;border:1px solid #111;color:#111;padding:4px 9px;font-size:12px;font-weight:700}
   .metric-card .level.alert{border-color:var(--red);color:var(--red)}
-  .red{color:var(--red)}.mint{color:var(--mint)}.sky{color:var(--sky)}.lime{color:var(--lime)}.blue{color:var(--blue)}
+  .red{color:var(--red)}.mint{color:var(--mint)}.sky{color:var(--sky)}.lime{color:var(--lime)}.blue{color:var(--blue)}.teal{color:var(--teal)}
   .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px}
   .chart-card{height:224px;background:var(--panel);border:3px solid currentColor;border-radius:24px;padding:16px 22px}
   .chart-card h3{margin:0 0 8px;font-size:20px;line-height:1;color:currentColor}
@@ -74,13 +74,15 @@ const METRICS = [
   {id:"cpu", label:"CPU 사용률", color:"red"},
   {id:"memory", label:"메모리 사용률", color:"mint"},
   {id:"disk", label:"디스크 사용률(C:)", color:"lime"},
+  {id:"disk_io", label:"디스크 I/O", color:"sky"},
   {id:"net_recv", label:"네트워크 수신량", color:"blue"},
-  {id:"net_sent", label:"네트워크 송신량", color:"sky"}
+  {id:"net_sent", label:"네트워크 송신량", color:"teal"}
 ];
 const AXES = {
   cpu: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
   memory: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
   disk: {max:100, ticks:[0,25,50,75,100], labels:["0","25","50","75","100"]},
+  disk_io: {max:120000000, ticks:[0,30000000,60000000,90000000,120000000], labels:["0","30M","60M","90M","120M"]},
   net_recv: {max:720000, ticks:[0,180000,360000,540000,720000], labels:["0k","180k","360k","540k","720k"]},
   net_sent: {max:158000, ticks:[0,39000,79000,118000,158000], labels:["0k","39k","79k","118k","158k"]}
 };
@@ -88,6 +90,7 @@ const THRESHOLDS = {
   cpu: {caution:70, warning:85, danger:95},
   memory: {caution:75, warning:85, danger:95},
   disk: {caution:80, warning:90, danger:95},
+  disk_io: {caution:30000000, warning:50000000, danger:100000000},
   net_recv: {caution:504000, warning:612000, danger:684000},
   net_sent: {caution:110600, warning:134300, danger:150100}
 };

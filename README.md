@@ -119,6 +119,7 @@ flowchart LR
 | `cpu` | CPU 사용률 | `%` | 70 | 90 |
 | `memory` | 메모리 사용률 | `%` | 70 | 90 |
 | `disk` | 디스크 사용률(C:) | `%` | 80 | 90 |
+| `disk_io` | 디스크 I/O(C:) | `B/s` | 50,000,000 | 100,000,000 |
 | `net_recv` | 네트워크 수신 | `B/s` | 50,000,000 | 100,000,000 |
 | `net_sent` | 네트워크 송신 | `B/s` | 50,000,000 | 100,000,000 |
 
@@ -185,14 +186,14 @@ Base URL은 실행 환경에 따라 달라집니다.
 |---|---|
 | 로컬 | `http://127.0.0.1:47892` |
 | Docker 내부 | `http://virnect-monitor:47892` |
-| 외부 터널/운영 | `https://<도메인>` |
+| 외부 터널/운영 | `https://monitor.yongun.shop/` |
 
 서버 이름과 지표 이름은 다음 값을 기준으로 사용합니다.
 
 | 구분 | 값 |
 |---|---|
 | 서버 | `server-01`, `server-02`, `server-03`, `server-04` |
-| 지표 | `cpu`, `memory`, `disk`, `net_recv`, `net_sent` |
+| 지표 | `cpu`, `memory`, `disk`, `disk_io`, `net_recv`, `net_sent` |
 
 ### 화면 페이지
 
@@ -292,6 +293,7 @@ Make&View 화면별 추천 연결은 다음과 같습니다.
 | CPU | `/api/metric/server-01/cpu` | `powercode`, `display`, `levelCode` |
 | 메모리 | `/api/metric/server-01/memory` | `powercode`, `display`, `levelCode` |
 | 디스크 | `/api/metric/server-01/disk` | `powercode`, `display`, `levelCode` |
+| 디스크 I/O | `/api/metric/server-01/disk_io` | `powercode`, `display`, `levelCode` |
 | 네트워크 수신 | `/api/metric/server-01/net_recv` | `powercode`, `display`, `levelCode` |
 | 네트워크 송신 | `/api/metric/server-01/net_sent` | `powercode`, `display`, `levelCode` |
 

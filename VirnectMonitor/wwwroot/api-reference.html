@@ -95,18 +95,19 @@
       <div class="desc">= 1 − levelCode</div>
     </div>
     <div class="box">
-      <h3>levelCode (지표 분류, 기존)</h3>
+      <h3>levelCode (상세 JSON)</h3>
       <table>
         <tr><td>0</td><td>클린</td></tr>
         <tr><td>1</td><td>보통(경고)</td></tr>
         <tr><td>2</td><td>위험</td></tr>
       </table>
+      <div class="desc">Make&amp;View 지표 API는 전원OFF를 포함해 0~3으로 변환.</div>
     </div>
     <div class="box">
       <h3>공통 값</h3>
       <table>
         <tr><td>서버</td><td>server-01 ~ server-04</td></tr>
-        <tr><td>지표</td><td>cpu, memory, disk, net_recv, net_sent</td></tr>
+        <tr><td>지표</td><td>cpu, memory, disk, disk_io, net_recv, net_sent</td></tr>
         <tr><td>시간</td><td>updatedAt(Unix초) + updatedAtText(KST 문자열)</td></tr>
       </table>
     </div>
@@ -182,7 +183,7 @@
   <span class="k">"metrics"</span>: {
     <span class="k">"cpu"</span>: { <span class="k">"value"</span>: <span class="n">79.5</span>, <span class="k">"display"</span>: <span class="s">"79.5%"</span>, <span class="k">"levelCode"</span>: <span class="n">1</span>, <span class="k">"status"</span>: <span class="n">0</span>, <span class="k">"unit"</span>: <span class="s">"%"</span>, ... },
     <span class="k">"memory"</span>: { <span class="k">"status"</span>: <span class="n">1</span>, ... },
-    ... (disk, net_recv, net_sent)
+    ... (disk, disk_io, net_recv, net_sent)
   }
 }</pre>
   </div>

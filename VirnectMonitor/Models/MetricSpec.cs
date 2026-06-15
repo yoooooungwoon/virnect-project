@@ -34,6 +34,9 @@ public static class Metrics
         new("disk", "디스크 사용률(C:)", "%",
             "100 - (avg by(server)(windows_logical_disk_free_bytes{volume=\"C:\"}) / avg by(server)(windows_logical_disk_size_bytes{volume=\"C:\"}) * 100)",
             80, 90),
+        new("disk_io", "디스크 I/O(C:)", "B/s",
+            "(sum by(server)(rate(windows_logical_disk_read_bytes_total{volume=\"C:\"}[1m])) + sum by(server)(rate(windows_logical_disk_write_bytes_total{volume=\"C:\"}[1m])))",
+            50_000_000, 100_000_000),
         // windows_net_bytes_total 엔 direction 라벨이 없어(송수신 합계) 방향별 분리 메트릭을 사용
         new("net_recv", "네트워크 수신", "B/s",
             "sum by(server)(rate(windows_net_bytes_received_total{nic!~\".*isatap.*\"}[1m]))",
