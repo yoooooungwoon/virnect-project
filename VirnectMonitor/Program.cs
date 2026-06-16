@@ -1,4 +1,5 @@
 // 모니터링 백엔드 진입점 — 수집기 등록 + Make&View/웹 프론트용 GET API 구성
+using Microsoft.AspNetCore.Mvc;
 using VirnectMonitor.Models;
 using VirnectMonitor.Auth;
 using VirnectMonitor.Services;
@@ -115,6 +116,7 @@ app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
     var alertNum = s is null ? 0 : s.Metrics.Values.Count(m => m.LevelCode >= 1);
     var operationCode = ResolveOperationCode(on, s);
     var checkMessage = BuildCheckMessage(on, s);
+    long? updated = s?.UpdatedAt ?? store.LastUpdated?.ToUnixTimeSeconds();
 
     return Results.Ok(new
     {
@@ -123,6 +125,7 @@ app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
         operationCode,
         checkMessage,
         alertNum,
+        updatedAtText = updated is { } u ? FormatKst(u) : null,  // 최근 조회시각(한국시간 문자열)
     });
 });
 
@@ -309,8 +312,10 @@ app.MapGet("/api/chart/{server}/{metric}", async (
 app.MapGet("/api/anomalies", async (MonitorDatabase db, int? limit, string? server, string? metric, CancellationToken ct) =>
     await db.RecentAnomaliesAsync(Math.Clamp(limit ?? 100, 1, 1000), server, metric, ct));
 
-app.MapGet("/api/alerts", async (MonitorDatabase db, int? limit, string? server, CancellationToken ct) =>
-    await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), server, ct));
+app.MapGet("/api/alerts", async (
+        MonitorDatabase db, int? limit, string? server,
+        [FromQuery(Name = "level_eq")] string? level, CancellationToken ct) =>
+    await db.RecentAlertsAsync(Math.Clamp(limit ?? 50, 1, 500), server, level, ct));
 
 app.Run();
 

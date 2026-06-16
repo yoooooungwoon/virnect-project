@@ -94,14 +94,17 @@ public sealed class MonitorDatabase(IOptions<MonitorOptions> options)
         return rows;
     }
 
-    public async Task<List<AlertRow>> RecentAlertsAsync(int limit, string? server, CancellationToken ct)
+    public async Task<List<AlertRow>> RecentAlertsAsync(int limit, string? server, string? level, CancellationToken ct)
     {
         await using var conn = await OpenAsync(ct);
         var cmd = conn.CreateCommand();
         cmd.CommandText =
             "SELECT id, server, metric, metric_name, value, level, prev_level, message, created_at FROM alerts " +
-            "WHERE ($s IS NULL OR server = $s) ORDER BY created_at DESC LIMIT $lim";
+            "WHERE ($s IS NULL OR server = $s) " +
+            "AND (($lvl IS NULL AND level <> 'clean') OR ($lvl IS NOT NULL AND level = $lvl)) " +
+            "ORDER BY created_at DESC LIMIT $lim";
         Bind(cmd, "$s", (object?)server ?? DBNull.Value);
+        Bind(cmd, "$lvl", (object?)level ?? DBNull.Value);
         Bind(cmd, "$lim", limit);
 
         var rows = new List<AlertRow>();

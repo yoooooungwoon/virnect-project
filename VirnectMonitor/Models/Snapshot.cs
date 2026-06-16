@@ -35,4 +35,13 @@ public sealed record AnomalyRow(
 /// <summary>DB alerts 행.</summary>
 public sealed record AlertRow(
     long Id, string Server, string Metric, string MetricName,
-    double Value, string Level, string? PrevLevel, string Message, long CreatedAt);
+    double Value, string Level, string? PrevLevel, string Message, long CreatedAt)
+{
+    /// <summary>레벨 코드: 0=클린, 1=보통(warning), 2=위험(danger).</summary>
+    public int LevelCode => Level switch
+    {
+        "danger" => 2,
+        "warning" => 1,
+        _ => 0,
+    };
+}
