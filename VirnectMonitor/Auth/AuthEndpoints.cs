@@ -207,6 +207,11 @@ public static class AuthEndpoints
                   margin-top: 40px;
                 }
 
+                .actions:empty {
+                  min-height: 0;
+                  margin-top: 0;
+                }
+
                 .button {
                   display: inline-flex;
                   align-items: center;
@@ -1044,9 +1049,9 @@ public static class AuthEndpoints
 
     private static string RenderLoginResultPage(AuthStatusResponse response, string token)
     {
-        var title = response.Authenticated ? "인증 완료" : "인증 불가";
+        var title = response.Authenticated ? "로그인 완료" : "인증 불가";
         var message = response.Authenticated
-            ? "인증이 완료되었습니다. 창을 닫고 기존 화면으로 돌아갑니다."
+            ? "로그인이 성공하였습니다. 상단의 완료 혹은 Done을 눌러 돌아가주세요."
             : $"상태: {WebUtility.HtmlEncode(response.Status)}";
         var authExpiresIso = response.AuthExpiresAt?.ToString("O") ?? "";
         var authExpiresDisplay = response.AuthExpiresAt is null
@@ -1054,7 +1059,7 @@ public static class AuthEndpoints
             : response.AuthExpiresAt.Value.ToString("yyyy-MM-dd HH:mm:ss 'KST'");
         var remainingDisplay = response.Authenticated && response.AuthExpiresAt is not null ? "calculating..." : "-";
         var actionLink = response.Authenticated
-            ? """<button class="button" id="close-window-button" type="button">창 닫기</button>"""
+            ? ""
             : """<a class="button" href="/auth/start">다시 로그인</a>""";
         var tokenJson = JsonSerializer.Serialize(token);
 
@@ -1098,7 +1103,6 @@ public static class AuthEndpoints
                 const titleEl = document.getElementById("result-title");
                 const messageEl = document.getElementById("result-message");
                 const actionsEl = document.getElementById("actions");
-                let closeAttempted = false;
                 function renderRemaining() {
                   if (!authenticated || !expiresAt || !remaining) {
                     if (remaining) {
@@ -1127,31 +1131,6 @@ public static class AuthEndpoints
                   remaining.textContent = "-";
                   actionsEl.innerHTML = '<a class="button" href="/auth/start">다시 로그인</a>';
                 }
-                function requestCloseWindow() {
-                  closeAttempted = true;
-                  window.close();
-                  setTimeout(() => {
-                    if (!document.hidden) {
-                      messageEl.textContent = "브라우저 정책으로 자동 종료가 막히면 이 창만 닫아주세요.";
-                    }
-                  }, 800);
-                }
-                function armCloseWindow() {
-                  if (!authenticated) {
-                    return;
-                  }
-
-                  const closeButton = document.getElementById("close-window-button");
-                  if (closeButton) {
-                    closeButton.addEventListener("click", requestCloseWindow);
-                  }
-
-                  setTimeout(() => {
-                    if (!closeAttempted) {
-                      requestCloseWindow();
-                    }
-                  }, 600);
-                }
                 async function pollStatus() {
                   if (!token) {
                     return;
@@ -1171,7 +1150,6 @@ public static class AuthEndpoints
                   }
                 }
                 renderRemaining();
-                armCloseWindow();
                 setInterval(renderRemaining, 1000);
                 setInterval(pollStatus, 2000);
               </script>

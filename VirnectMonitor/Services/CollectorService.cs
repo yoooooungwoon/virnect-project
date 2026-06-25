@@ -8,6 +8,7 @@ public sealed class CollectorService(
     PrometheusClient prometheus,
     MonitorStore store,
     MonitorDatabase database,
+    DiscordWebhookNotifier discord,
     IOptions<MonitorOptions> options,
     ILogger<CollectorService> logger) : BackgroundService
 {
@@ -98,6 +99,7 @@ public sealed class CollectorService(
                     await database.InsertAlertAsync(
                         server, spec.Id, spec.Name, value, Metrics.Key(level),
                         Metrics.Key(prev), message, createdAt, ct);
+                    await discord.SendLevelChangedAsync(server, spec, value, level, prev, createdAt, ct);
                 }
                 store.SetLastLevel(server, spec.Id, level);
             }

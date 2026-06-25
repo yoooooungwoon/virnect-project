@@ -2,7 +2,7 @@
 
 VIRNECT 앱과 Make&View를 활용해 서버실 장비 상태를 AR 화면에서 확인하고, 필요한 경우 웹 대시보드로 이동해 서버별 지표와 그래프를 확인하는 통합 모니터링 시스템입니다.
 
-현재 구현은 C# ASP.NET Core 기반의 `VirnectMonitor` 단일 백엔드로 구성되어 있습니다. Prometheus가 수집한 서버 지표를 백엔드가 주기적으로 가져오고, 서버 상태를 `클린 / 보통 / 위험`으로 분류해 Make&View API와 웹 대시보드에 제공합니다.
+현재 구현은 C# ASP.NET Core 기반의 `VirnectMonitor` 단일 백엔드로 구성되어 있습니다. Prometheus가 수집한 서버 지표를 백엔드가 주기적으로 가져오고, 서버 상태를 `클린 / 보통 / 위험`으로 분류해 Make&View API, 웹 대시보드, Discord 서버별 알림에 제공합니다.
 
 ## 1. 컨셉
 
@@ -22,6 +22,7 @@ VIRNECT 앱과 Make&View를 활용해 서버실 장비 상태를 AR 화면에서
 | 실시간 모니터링 | Prometheus 지표를 주기적으로 수집해 최신 상태 제공 |
 | 이상징후 기록 | 보통/위험 상태와 레벨 전환 이벤트를 SQLite에 저장 |
 | 웹 그래프 확인 | 전체 서버 또는 서버별 시계열 그래프 제공 |
+| Discord 알림 | 서버별 웹훅으로 경고/위험/복구 전환 알림 전송 |
 
 ## 2. 플로우차트
 
@@ -30,7 +31,7 @@ flowchart LR
   QR["QR 스캔<br/>VIRNECT 앱"] --> LOGIN["로그인<br/>URL 이동"]
   LOGIN --> POS["서버 위치<br/>AR 화면"]
 
-  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>운영상태: 전원OFF/클린/경고/위험<br/>알림수: 위험 항목 수"]
+  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>운영상태: 전원OFF/클린/경고/위험<br/>알림수: 보통/위험 항목 수"]
 
   POS <--> MONITOR["서버 1, 2, 3, 4<br/>모니터링"]
   MONITOR <--> ALERT["알림<br/>보통/위험 항목 표시"]
@@ -61,6 +62,7 @@ flowchart TB
     METRICS["MetricSpec<br/>지표/PromQL/임계치 정의"]
     STORE["MonitorStore<br/>현재 상태 메모리 저장"]
     DB["SQLite<br/>anomalies / alerts / auth"]
+    DISCORD["DiscordWebhookNotifier<br/>서버별 웹훅 알림"]
     AUTH["Auth 모듈<br/>관리자 / 토큰 / 세션"]
     API["Minimal API<br/>Make&View / 대시보드 응답"]
     STATIC["wwwroot<br/>대시보드 HTML"]
@@ -71,6 +73,7 @@ flowchart TB
   METRICS --> COLLECTOR
   COLLECTOR --> STORE
   COLLECTOR --> DB
+  COLLECTOR --> DISCORD
   AUTH --> DB
   API --> STORE
   API --> DB
@@ -78,6 +81,7 @@ flowchart TB
 
   MV["VIRNECT Make&View<br/>GET API JSON 필드 연결"] --> API
   DASH["웹 대시보드<br/>전체 / 서버별 / 그래프"] --> API
+  DISCORD --> DCH["Discord 채널<br/>server-01 ~ server-04"]
   STATIC --> DASH
 ```
 
@@ -90,7 +94,9 @@ flowchart TB
 | `VirnectMonitor/Services/PrometheusClient.cs` | Prometheus instant/range query 호출 |
 | `VirnectMonitor/Services/MonitorStore.cs` | 최신 서버 상태와 직전 레벨을 메모리에 저장 |
 | `VirnectMonitor/Services/MonitorDatabase.cs` | 이상징후와 알림 이벤트를 SQLite에 저장 |
+| `VirnectMonitor/Services/DiscordWebhookNotifier.cs` | 서버별 Discord 웹훅 embed 알림 전송 |
 | `VirnectMonitor/Models/MetricSpec.cs` | 수집 지표, PromQL, 임계치 정의 |
+| `VirnectMonitor/Models/DiscordOptions.cs` | Discord 알림 설정 모델 |
 | `VirnectMonitor/Auth/*` | 관리자 계정, 로그인 토큰, 세션, 감사 로그 |
 | `VirnectMonitor/wwwroot/index.html` | 전체 서버 대시보드 |
 | `VirnectMonitor/wwwroot/server.html` | 서버별 상세 대시보드 |
@@ -110,6 +116,7 @@ flowchart LR
   D --> E["MonitorStore<br/>현재 상태 갱신"]
   D --> F["SQLite anomalies<br/>보통/위험 기록"]
   D --> G["SQLite alerts<br/>레벨 전환 기록"]
+  G --> H["Discord<br/>서버별 웹훅 알림"]
 ```
 
 수집 대상 지표와 백엔드 임계치는 다음과 같습니다.
@@ -157,6 +164,18 @@ flowchart LR
 | `powercode` | `1` | 서버 켜짐 |
 | `powercode` | `0` | 서버 꺼짐 |
 
+### Discord 알림
+
+Discord 알림은 `alerts` 레벨 전환 이벤트와 같은 시점에 전송합니다. 매 수집 주기마다 반복 전송하지 않고, 지표 상태가 바뀔 때만 서버별 웹훅으로 embed 메시지를 보냅니다.
+
+| 전환 예시 | Discord 제목 |
+|---|---|
+| `clean -> warning` | `🟡 [경고 발생] server-01` |
+| `warning -> danger` | `🔴 [위험 발생] server-01` |
+| `danger -> clean` | `🟢 [정상 복구] server-01` |
+
+메시지에는 서버, 지표, 현재값, 상태변경, KST 시간이 포함됩니다. 웹훅 URL은 비밀값이므로 `VirnectMonitor/appsettings.local.json`, 환경변수, 또는 `Discord:WebhookFilePath`로 지정한 로컬 파일에만 저장합니다.
+
 ### 인증
 
 인증 기능은 `Auth` 모듈에 분리되어 있습니다.
@@ -164,6 +183,7 @@ flowchart LR
 - 최초 실행 시 관리자 계정이 없으면 `/setup`에서 관리자 계정을 생성합니다.
 - 로그인 시작 시 랜덤 토큰을 만들고 DB에는 토큰 원문이 아닌 `token_hash`를 저장합니다.
 - 비밀번호는 PBKDF2-SHA256으로 해시하여 저장합니다.
+- 로그인 성공 화면은 모바일/브라우저의 자동 창닫기 제한을 고려해 `상단의 완료 혹은 Done을 눌러 돌아가주세요.` 안내를 표시합니다.
 - 승인된 세션이 살아 있는 동안 `/server`, `/server-01` 같은 대시보드 화면에 접근할 수 있습니다.
 - 세션과 로그인 시도 기록은 SQLite에 저장됩니다.
 
@@ -173,7 +193,7 @@ flowchart LR
 
 | 화면 | 주소 | 설명 |
 |---|---|---|
-| 전체 대시보드 | `/server` | 전체 서버 상태, 전체 그래프, 서버 탭 |
+| 전체 대시보드 | `/server` | 전체 서버 상태, 전체 그래프 기본 표시, 서버 탭 |
 | 서버별 대시보드 | `/server-01` | 서버 1대의 지표 카드와 그래프 |
 | 관리자 모니터 | `/admin` | 인증 세션과 로그인 감사 로그 |
 | API 레퍼런스 | `/api-reference.html` | API 설명 페이지 |
@@ -402,7 +422,7 @@ docker compose up -d --build
 
 Docker Compose는 Prometheus가 이미 만든 외부 네트워크 `prometheus_default`에 연결하는 구성을 사용합니다. Cloudflare Tunnel을 사용할 경우 `.env`에 `TUNNEL_TOKEN`을 설정합니다.
 
-주요 설정은 `VirnectMonitor/appsettings.json` 또는 환경변수로 변경합니다.
+주요 설정은 `VirnectMonitor/appsettings.json`, Git에 올리지 않는 `VirnectMonitor/appsettings.local.json`, 또는 환경변수로 변경합니다.
 
 | 설정 | 기본값 | 설명 |
 |---|---|---|
@@ -416,5 +436,12 @@ Docker Compose는 Prometheus가 이미 만든 외부 네트워크 `prometheus_de
 | `Auth:LoginExpiresMinutes` | `10` | 로그인 토큰 유효 시간 |
 | `Auth:AuthDurationMinutes` | `30` | 인증 유지 시간 |
 | `Auth:MaxFailureCount` | `5` | 로그인 실패 허용 횟수 |
+| `Discord:Enabled` | `false` | 서버별 Discord 웹훅 알림 사용 여부 |
+| `Discord:Username` | `VIRNECT Monitor` | Discord 웹훅 메시지 표시 이름 |
+| `Discord:AvatarUrl` | `` | Discord 웹훅 메시지 아바타 URL |
+| `Discord:WebhookFilePath` | `` | `server-01 : https://...` 형식의 서버별 웹훅 파일 경로 |
+| `Discord:ServerWebhooks:{server}` | `` | 환경변수/로컬 설정으로 지정하는 서버별 웹훅 URL |
 
 운영 환경에서는 반드시 `Auth:ServerSecret`을 안전한 값으로 변경해야 합니다.
+
+Discord 알림은 지표 상태가 바뀌는 시점에만 전송합니다. 예를 들어 `정상 -> 경고`, `경고 -> 위험`, `위험 -> 정상` 전환 때 서버별 웹훅으로 embed 메시지를 보냅니다. 웹훅 URL은 비밀값이므로 `VirnectMonitor/appsettings.local.json` 또는 환경변수에만 저장하고 Git에 커밋하지 않습니다.

@@ -6,8 +6,17 @@ using VirnectMonitor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration
+    .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true);
+
 builder.Services.Configure<MonitorOptions>(builder.Configuration.GetSection("Monitor"));
+builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection("Discord"));
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<DiscordWebhookNotifier>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+});
 builder.Services.AddSingleton<PrometheusClient>();
 builder.Services.AddSingleton<MonitorStore>();
 builder.Services.AddSingleton<MonitorDatabase>();

@@ -1,16 +1,35 @@
 # .NET 빌드 산출물
 bin/
 obj/
+publish/
+artifacts/
 *.user
 
 # SQLite DB
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
+VirnectMonitor/Data/
 
 # 환경/시크릿
 appsettings.*.local.json
+appsettings.local.json
+.env.*
 .env
+
+# 로그 / 테스트 / 임시 산출물
+logs/
+*.log
+TestResults/
+*.trx
+*.coverage
+coverage/
+.tmp*/
+tmp/
+temp/
+Captures/
 
 # 다른 프로젝트(PUBG) 바이블 — 이 레포에 포함하지 않음
 CLAUDE.md
