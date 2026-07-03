@@ -16,6 +16,11 @@ services:
       - Auth__PublicBaseUrl=${AUTH_PUBLIC_BASE_URL:-}
       - Auth__DatabasePath=/data/auth.db
       - Auth__ServerSecret=${AUTH_SERVER_SECRET:-development-only-change-me}
+      - Discord__Enabled=true
+      - Discord__ServerWebhooks__server-01=${DISCORD_WEBHOOK_SERVER_01}
+      - Discord__ServerWebhooks__server-02=${DISCORD_WEBHOOK_SERVER_02}
+      - Discord__ServerWebhooks__server-03=${DISCORD_WEBHOOK_SERVER_03}
+      - Discord__ServerWebhooks__server-04=${DISCORD_WEBHOOK_SERVER_04}
     volumes:
       # ③ monitoring.db를 named volume에 저장 → 컨테이너 재시작/재배포에도 이상징후 기록 보존
       - monitor-data:/data
