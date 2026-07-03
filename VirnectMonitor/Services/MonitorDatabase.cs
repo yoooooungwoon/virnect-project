@@ -99,7 +99,7 @@ public sealed class MonitorDatabase(IOptions<MonitorOptions> options)
         await using var conn = await OpenAsync(ct);
         var cmd = conn.CreateCommand();
         cmd.CommandText =
-            "SELECT id, server, metric, metric_name, value, level, prev_level, message, created_at FROM alerts " +
+            "SELECT id, server, metric, metric_name, value, level, prev_level, created_at FROM alerts " +
             "WHERE ($s IS NULL OR server = $s) " +
             "AND (($lvl IS NULL AND level <> 'clean') OR ($lvl IS NOT NULL AND level = $lvl)) " +
             "ORDER BY created_at DESC LIMIT $lim";
@@ -113,7 +113,8 @@ public sealed class MonitorDatabase(IOptions<MonitorOptions> options)
             rows.Add(new AlertRow(
                 r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetString(3),
                 r.GetDouble(4), r.GetString(5), r.IsDBNull(6) ? null : r.GetString(6),
-                r.GetString(7), r.GetInt64(8)));
+                Metrics.AlertMessage(r.GetString(2), r.GetString(3), r.GetDouble(4), r.GetString(5), r.GetInt64(7)),
+                r.GetInt64(7)));
         return rows;
     }
 

@@ -100,7 +100,7 @@ app.MapGet("/api/health", (MonitorStore store, IConfiguration config) => new
 // 지표 정의/임계치 (프론트 표시용)
 app.MapGet("/api/metrics", () => new
 {
-    levels = new { clean = "클린", warning = "보통", danger = "위험" },
+    levels = new { clean = "클린", warning = "경고", danger = "위험" },
     metrics = Metrics.All.Select(m => new { m.Id, m.Name, m.Unit, m.Warn, m.Danger }),
 });
 
@@ -114,7 +114,7 @@ app.MapGet("/api/status", (MonitorStore store) => new
 
 
 // 서버 1대 장비요약 — Make&View 연결용으로 필요한 값만 응답. 꺼진 서버도 powercode:0으로 응답.
-//  powercode 1=켜짐 0=꺼짐, operationCode 0=전원OFF 1=클린 2=경고 3=위험, alertNum 이상징후 개수
+//  powercode 1=켜짐 0=꺼짐, operationCode 0=전원없음 1=클린 2=경고 3=위험, alertNum 이상징후 개수
 app.MapGet("/api/server/{server}", (string server, MonitorStore store) =>
 {
     if (!store.ServerUp.TryGetValue(server, out var up))
@@ -165,7 +165,7 @@ app.MapGet("/api/server/{server}/metrics", (string server, MonitorStore store) =
 
 // --- Make&View 친화: 단일 숫자값 ------------------------------------
 // 지표 1개의 현재값 (Make&View가 powercode, display, levelCode만 연결)
-//  levelCode 0=전원OFF 1=클린 2=경고 3=위험
+//  levelCode 0=전원없음 1=클린 2=경고 3=위험
 app.MapGet("/api/metric/{server}/{metric}", (string server, string metric, MonitorStore store) =>
 {
     if (!Metrics.ById.ContainsKey(metric))
@@ -176,7 +176,7 @@ app.MapGet("/api/metric/{server}/{metric}", (string server, string metric, Monit
 
     var powercode = up == 1 ? 1 : 0;
     if (powercode == 0)
-        return Results.Ok(new { powercode, display = "전원 OFF", levelCode = 0 });
+        return Results.Ok(new { powercode, display = "전원없음", levelCode = 0 });
 
     if (store.Snapshot.TryGetValue(server, out var s) && s.Metrics.TryGetValue(metric, out var m))
         return Results.Ok(new
@@ -195,14 +195,14 @@ app.MapGet("/api/alert/{server}", (string server, MonitorStore store) =>
         ? Results.Ok(new { server, value = s.OverallCode, level = s.Overall, levelText = s.OverallText })
         : Results.NotFound(new { error = "서버 없음", server }));
 
-// 서버별 이상징후 알림 목록 (보통·위험만, 정상 제외, 최대 5개) — AR 알림 표시용
+// 서버별 이상징후 알림 목록 (경고·위험만, 정상 제외, 최대 5개) — AR 알림 표시용
 app.MapGet("/api/alert/{server}/issues", (string server, MonitorStore store) =>
 {
     if (!store.Snapshot.TryGetValue(server, out var s))
         return Results.NotFound(new { error = "서버 없음", server });
 
     var alerts = s.Metrics.Values
-        .Where(m => m.LevelCode >= 1)               // 클린(0) 제외, 보통(1)·위험(2)만
+        .Where(m => m.LevelCode >= 1)               // 클린(0) 제외, 경고(1)·위험(2)만
         .OrderByDescending(m => m.LevelCode)        // 위험 먼저
         .ThenBy(m => m.Id)
         .Select(m => new

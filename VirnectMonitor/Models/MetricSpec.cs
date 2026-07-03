@@ -1,4 +1,4 @@
-// 수집 지표 정의와 클린/보통/위험 분류 로직
+// 수집 지표 정의와 클린/경고/위험 분류 로직
 using System.Globalization;
 
 namespace VirnectMonitor.Models;
@@ -7,7 +7,7 @@ namespace VirnectMonitor.Models;
 public enum Level
 {
     Clean = 0,   // 클린
-    Warning = 1, // 보통
+    Warning = 1, // 경고
     Danger = 2,  // 위험
 }
 
@@ -59,9 +59,28 @@ public static class Metrics
     public static string Text(Level level) => level switch
     {
         Level.Danger => "위험",
-        Level.Warning => "보통",
+        Level.Warning => "경고",
         _ => "클린",
     };
+
+
+    /// <summary>알림 이력 API에서 쓰는 한 줄 메시지.</summary>
+    public static string AlertMessage(string metric, string metricName, double value, string level, long createdAt)
+    {
+        var status = level switch
+        {
+            "danger" => "위험",
+            "warning" => "경고",
+            _ => "정상 복구",
+        };
+        var time = DateTimeOffset.FromUnixTimeSeconds(createdAt)
+            .ToOffset(TimeSpan.FromHours(9))
+            .ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        var valueStr = ById.TryGetValue(metric, out var spec)
+            ? Human(spec, value)
+            : value.ToString("F2", CultureInfo.InvariantCulture);
+        return $"[{time}] {metricName} {status} ({valueStr})";
+    }
 
     /// <summary>알림 메시지용 사람이 읽기 좋은 값.</summary>
     public static string Human(MetricSpec spec, double value)

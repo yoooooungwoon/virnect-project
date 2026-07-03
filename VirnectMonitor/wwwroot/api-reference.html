@@ -78,7 +78,7 @@
     <div class="box">
       <h3>operationCode (장비요약 운영상태)</h3>
       <table>
-        <tr><td>0</td><td>전원 OFF</td></tr>
+        <tr><td>0</td><td>전원없음</td></tr>
         <tr><td>1</td><td>클린</td></tr>
         <tr><td>2</td><td>경고</td></tr>
         <tr><td>3</td><td>위험</td></tr>
@@ -98,10 +98,10 @@
       <h3>levelCode (상세 JSON)</h3>
       <table>
         <tr><td>0</td><td>클린</td></tr>
-        <tr><td>1</td><td>보통(경고)</td></tr>
+        <tr><td>1</td><td>경고</td></tr>
         <tr><td>2</td><td>위험</td></tr>
       </table>
-      <div class="desc">Make&amp;View 지표 API는 전원OFF를 포함해 0~3으로 변환.</div>
+      <div class="desc">Make&amp;View 지표 API는 전원없음을 포함해 0~3으로 변환.</div>
     </div>
     <div class="box">
       <h3>공통 값</h3>
@@ -161,7 +161,7 @@
 <pre>{
   <span class="k">"server"</span>: <span class="s">"server-01"</span>,
   <span class="k">"powercode"</span>: <span class="n">1</span>,            <span class="k">// 1 켜짐 / 0 꺼짐</span>
-  <span class="k">"operationCode"</span>: <span class="n">3</span>,         <span class="k">// 0 전원OFF / 1 클린 / 2 경고 / 3 위험</span>
+  <span class="k">"operationCode"</span>: <span class="n">3</span>,         <span class="k">// 0 전원없음 / 1 클린 / 2 경고 / 3 위험</span>
   <span class="k">"checkMessage"</span>: <span class="s">"CPU 사용률, 디스크 사용률 확인 필요"</span>,
   <span class="k">"alertNum"</span>: <span class="n">1</span>              <span class="k">// 이상징후 개수</span>
 }</pre>
@@ -190,20 +190,20 @@
 
   <div class="api">
     <div class="top"><span class="m GET">GET</span><span class="path">/api/metric/{server}/{metric}</span></div>
-    <p class="desc">Make&amp;View 지표 화면용 짧은 JSON. 전원 조건은 <code>powercode</code>, 값 표시는 <code>display</code>, 상태 조건은 <code>levelCode</code>를 연결. <code>levelCode</code>는 0 전원OFF / 1 클린 / 2 경고 / 3 위험.</p>
+    <p class="desc">Make&amp;View 지표 화면용 짧은 JSON. 전원 조건은 <code>powercode</code>, 값 표시는 <code>display</code>, 상태 조건은 <code>levelCode</code>를 연결. <code>levelCode</code>는 0 전원없음 / 1 클린 / 2 경고 / 3 위험.</p>
 <pre>{ <span class="k">"powercode"</span>:<span class="n">1</span>, <span class="k">"display"</span>:<span class="s">"79.5%"</span>, <span class="k">"levelCode"</span>:<span class="n">2</span> }</pre>
   </div>
 
   <div class="api">
     <div class="top"><span class="m GET">GET</span><span class="path">/api/alert/{server}</span></div>
     <p class="desc">서버 종합 심각도 1개 (AR 알림 트리거: value&gt;=2 위험).</p>
-<pre>{ <span class="k">"server"</span>:<span class="s">"server-01"</span>, <span class="k">"value"</span>:<span class="n">1</span>, <span class="k">"level"</span>:<span class="s">"warning"</span>, <span class="k">"levelText"</span>:<span class="s">"보통"</span> }</pre>
+<pre>{ <span class="k">"server"</span>:<span class="s">"server-01"</span>, <span class="k">"value"</span>:<span class="n">1</span>, <span class="k">"level"</span>:<span class="s">"warning"</span>, <span class="k">"levelText"</span>:<span class="s">"경고"</span> }</pre>
   </div>
 
   <div class="api">
     <div class="top"><span class="m GET">GET</span><span class="path">/api/alert/{server}/issues</span>
       <span class="tag new">신규</span></div>
-    <p class="desc">서버별 <b>이상징후만</b>(보통·위험) 목록. 정상은 제외, 없으면 빈 배열. 최대 5개.</p>
+    <p class="desc">서버별 <b>이상징후만</b>(경고·위험) 목록. 정상은 제외, 없으면 빈 배열. 최대 5개.</p>
 <pre>{
   <span class="k">"server"</span>: <span class="s">"server-01"</span>,
   <span class="k">"updatedAt"</span>: <span class="n">1781257155</span>,
@@ -211,7 +211,7 @@
   <span class="k">"count"</span>: <span class="n">1</span>,
   <span class="k">"alerts"</span>: [
     { <span class="k">"metric"</span>:<span class="s">"cpu"</span>, <span class="k">"name"</span>:<span class="s">"CPU 사용률"</span>, <span class="k">"value"</span>:<span class="n">79.5</span>, <span class="k">"display"</span>:<span class="s">"79.5%"</span>,
-      <span class="k">"levelCode"</span>:<span class="n">1</span>, <span class="k">"levelText"</span>:<span class="s">"보통"</span>, <span class="k">"message"</span>:<span class="s">"CPU 사용률 79.5% 보통"</span> }
+      <span class="k">"levelCode"</span>:<span class="n">1</span>, <span class="k">"levelText"</span>:<span class="s">"경고"</span>, <span class="k">"message"</span>:<span class="s">"CPU 사용률 79.5% 경고"</span> }
   ]
 }</pre>
   </div>
@@ -239,7 +239,10 @@
 
   <div class="api">
     <div class="top"><span class="m GET">GET</span><span class="path">/api/alerts</span></div>
-    <p class="desc">레벨 전환 알림 이력(SQLite). 쿼리: <b>?limit=50&amp;server=</b></p>
+    <p class="desc">레벨 전환 알림 이력(SQLite). 쿼리: <b>?limit=50&amp;server=</b>. <code>message</code>는 서버별 화면 표시용 한 줄 문구.</p>
+<pre>[
+  { <span class="k">"message"</span>:<span class="s">"[15:16:35] CPU 사용률 경고 (83.2%)"</span> }
+]</pre>
   </div>
 
   <!-- ── 인증 API ───────────────────────────────────── -->

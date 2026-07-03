@@ -87,7 +87,7 @@
   <circle cx="566" cy="299" r="14" fill="#7A8594"/>
   <text x="561" y="304" fill="#FFFFFF" style="font-family:'Segoe UI';font-size:14px;font-weight:800;">0</text>
   <text x="596" y="292" class="body">powercode = 0</text>
-  <text x="596" y="316" class="small">전원 OFF, operationCode = 0</text>
+  <text x="596" y="316" class="small">전원없음, operationCode = 0</text>
 
   <line x1="708" y1="334" x2="708" y2="363" class="arrow"/>
 
@@ -165,7 +165,7 @@
   <rect x="64" y="832" width="1272" height="54" rx="16" fill="#FFFFFF" stroke="#DDE6EE"/>
   <text x="96" y="866" class="small">색상 규칙:</text>
   <circle cx="182" cy="861" r="7" fill="#7A8594"/>
-  <text x="198" y="866" class="small">0 전원OFF</text>
+  <text x="198" y="866" class="small">0 전원없음</text>
   <circle cx="306" cy="861" r="7" fill="#168A4A"/>
   <text x="322" y="866" class="small">1 클린</text>
   <circle cx="414" cy="861" r="7" fill="#D98A00"/>

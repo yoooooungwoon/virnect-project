@@ -1,4 +1,4 @@
-// 5초마다 Prometheus 조회 → 클린/보통/위험 분류 → 이상징후 기록 → 메모리 스냅샷 갱신
+// 5초마다 Prometheus 조회 → 클린/경고/위험 분류 → 이상징후 기록 → 메모리 스냅샷 갱신
 using Microsoft.Extensions.Options;
 using VirnectMonitor.Models;
 
@@ -93,9 +93,7 @@ public sealed class CollectorService(
                 var prev = store.GetLastLevel(server, spec.Id);
                 if (level != prev)
                 {
-                    var message = level == Level.Clean
-                        ? $"[{server}] {spec.Name} 정상 복구 ({Metrics.Human(spec, value)})"
-                        : $"[{server}] {spec.Name} {Metrics.Text(level)} 상태 ({Metrics.Human(spec, value)})";
+                    var message = Metrics.AlertMessage(spec.Id, spec.Name, value, Metrics.Key(level), createdAt);
                     await database.InsertAlertAsync(
                         server, spec.Id, spec.Name, value, Metrics.Key(level),
                         Metrics.Key(prev), message, createdAt, ct);

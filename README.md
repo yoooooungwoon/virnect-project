@@ -2,7 +2,7 @@
 
 VIRNECT 앱과 Make&View를 활용해 서버실 장비 상태를 AR 화면에서 확인하고, 필요한 경우 웹 대시보드로 이동해 서버별 지표와 그래프를 확인하는 통합 모니터링 시스템입니다.
 
-현재 구현은 C# ASP.NET Core 기반의 `VirnectMonitor` 단일 백엔드로 구성되어 있습니다. Prometheus가 수집한 서버 지표를 백엔드가 주기적으로 가져오고, 서버 상태를 `클린 / 보통 / 위험`으로 분류해 Make&View API, 웹 대시보드, Discord 서버별 알림에 제공합니다.
+현재 구현은 C# ASP.NET Core 기반의 `VirnectMonitor` 단일 백엔드로 구성되어 있습니다. Prometheus가 수집한 서버 지표를 백엔드가 주기적으로 가져오고, 서버 상태를 `클린 / 경고 / 위험`으로 분류해 Make&View API, 웹 대시보드, Discord 서버별 알림에 제공합니다.
 
 ## 1. 컨셉
 
@@ -20,7 +20,7 @@ VIRNECT 앱과 Make&View를 활용해 서버실 장비 상태를 AR 화면에서
 | AR 기반 상태 확인 | 서버 위치에서 전원 상태, 위험도, 알림 수를 바로 확인 |
 | 단순한 API 연결 | Make&View에서 연결하기 쉬운 GET API와 JSON 필드 제공 |
 | 실시간 모니터링 | Prometheus 지표를 주기적으로 수집해 최신 상태 제공 |
-| 이상징후 기록 | 보통/위험 상태와 레벨 전환 이벤트를 SQLite에 저장 |
+| 이상징후 기록 | 경고/위험 상태와 레벨 전환 이벤트를 SQLite에 저장 |
 | 웹 그래프 확인 | 전체 서버 또는 서버별 시계열 그래프 제공 |
 | Discord 알림 | 서버별 웹훅으로 경고/위험/복구 전환 알림 전송 |
 
@@ -31,10 +31,10 @@ flowchart LR
   QR["QR 스캔<br/>VIRNECT 앱"] --> LOGIN["로그인<br/>URL 이동"]
   LOGIN --> POS["서버 위치<br/>AR 화면"]
 
-  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>운영상태: 전원OFF/클린/경고/위험<br/>알림수: 보통/위험 항목 수"]
+  POS <--> SUMMARY["장비 요약<br/>전원상태: on/off<br/>운영상태: 전원없음/클린/경고/위험<br/>알림수: 경고/위험 항목 수"]
 
   POS <--> MONITOR["서버 1, 2, 3, 4<br/>모니터링"]
-  MONITOR <--> ALERT["알림<br/>보통/위험 항목 표시"]
+  MONITOR <--> ALERT["알림<br/>경고/위험 항목 표시"]
 
   POS <--> GRAPH["그래프<br/>전체 / 서버별"]
   GRAPH <--> DETAIL["그래프 자세히보기"]
@@ -114,14 +114,14 @@ flowchart LR
   B --> C["지표별 값 수집"]
   C --> D["clean / warning / danger 분류"]
   D --> E["MonitorStore<br/>현재 상태 갱신"]
-  D --> F["SQLite anomalies<br/>보통/위험 기록"]
+  D --> F["SQLite anomalies<br/>경고/위험 기록"]
   D --> G["SQLite alerts<br/>레벨 전환 기록"]
   G --> H["Discord<br/>서버별 웹훅 알림"]
 ```
 
 수집 대상 지표와 백엔드 임계치는 다음과 같습니다.
 
-| id | 이름 | 단위 | 보통(warn) | 위험(danger) |
+| id | 이름 | 단위 | 경고(warn) | 위험(danger) |
 |---|---|---|---:|---:|
 | `cpu` | CPU 사용률 | `%` | 70 | 90 |
 | `memory` | 메모리 사용률 | `%` | 70 | 90 |
@@ -135,14 +135,14 @@ flowchart LR
 | 상태 | key | levelCode | 설명 |
 |---|---:|---:|---|
 | 클린 | `clean` | `0` | 임계치 미만 |
-| 보통 | `warning` | `1` | warn 이상, danger 미만 |
+| 경고 | `warning` | `1` | warn 이상, danger 미만 |
 | 위험 | `danger` | `2` | danger 이상 |
 
-단, Make&View에서 바로 연결하는 `/api/server/{server}`와 `/api/metric/{server}/{metric}`의 운영/상태 코드는 전원 OFF까지 포함해 아래처럼 사용합니다.
+단, Make&View에서 바로 연결하는 `/api/server/{server}`와 `/api/metric/{server}/{metric}`의 운영/상태 코드는 전원없음까지 포함해 아래처럼 사용합니다.
 
 | 코드 | 의미 |
 |---:|---|
-| `0` | 전원OFF |
+| `0` | 전원없음 |
 | `1` | 클린 |
 | `2` | 경고 |
 | `3` | 위험 |
@@ -152,7 +152,7 @@ flowchart LR
 | status | 의미 |
 |---:|---|
 | `1` | 클린 |
-| `0` | 보통 |
+| `0` | 경고 |
 | `-1` | 위험 |
 
 ### 전원 상태
@@ -258,7 +258,7 @@ Base URL은 실행 환경에 따라 달라집니다.
 | 서버 상세 지표 | GET | `/api/server/{server}/metrics` | 선택/디버깅용 전원 상태, 알림 수, 지표 목록 |
 | 지표 현재값 | GET | `/api/metric/{server}/{metric}` | 특정 서버의 특정 지표값 |
 | 서버 위험도 | GET | `/api/alert/{server}` | 서버 종합 위험도 |
-| 서버 이상징후 | GET | `/api/alert/{server}/issues` | 보통/위험 지표 목록 |
+| 서버 이상징후 | GET | `/api/alert/{server}/issues` | 경고/위험 지표 목록 |
 | 전체 위험도 | GET | `/api/alert` | 전체 서버 중 가장 높은 위험도 |
 | 서버별 그래프 | GET | `/api/history/{server}/{metric}?minutes=60&step=15` | 서버 1대의 시계열 |
 | 전체 그래프 | GET | `/api/history/{metric}?minutes=60&step=15` | 모든 서버의 특정 지표 시계열 |
@@ -275,20 +275,21 @@ Make&View에서는 아래 표의 `JSON 필드`를 요청 body 또는 응답 필�
 | 로그아웃 신청 | `POST /auth/logout?token={token}` | `command` | string | `logout` | 요청 body로 전송 |
 | 로그아웃 결과 | `POST /auth/logout?token={token}` | `value` | number | `1` | `1`이면 로그아웃 처리됨 |
 | 장비 요약 | `GET /api/server/server-01` | `powercode` | number | `1` | `1=on`, `0=off` |
-| 장비 요약 | `GET /api/server/server-01` | `alertNum` | number | `2` | 보통/위험 항목 개수 |
-| 장비 요약 | `GET /api/server/server-01` | `operationCode` | number | `3` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
+| 장비 요약 | `GET /api/server/server-01` | `alertNum` | number | `2` | 경고/위험 항목 개수 |
+| 장비 요약 | `GET /api/server/server-01` | `operationCode` | number | `3` | `0=전원없음`, `1=클린`, `2=경고`, `3=위험` |
 | 장비 요약 | `GET /api/server/server-01` | `checkMessage` | string | `CPU 사용률, 디스크 사용률 확인 필요` | 확인 필요 한 줄 요약 |
-| 서버 위험도 | `GET /api/alert/server-01` | `value` | number | `2` | 보조 조회: `0=클린`, `1=보통`, `2=위험` |
+| 서버 위험도 | `GET /api/alert/server-01` | `value` | number | `2` | 보조 조회: `0=클린`, `1=경고`, `2=위험` |
 | 서버 위험도 | `GET /api/alert/server-01` | `level` | string | `danger` | 보조 조회 상태 키 |
 | 서버 위험도 | `GET /api/alert/server-01` | `levelText` | string | `위험` | 보조 조회 상태 표시 텍스트 |
 | 지표 수치 | `GET /api/metric/server-01/cpu` | `powercode` | number | `1` | `1=on`, `0=off` |
 | 지표 수치 | `GET /api/metric/server-01/cpu` | `display` | string | `83.2%` | 화면 텍스트 표시 |
-| 지표 수치 | `GET /api/metric/server-01/cpu` | `levelCode` | number | `2` | `0=전원OFF`, `1=클린`, `2=경고`, `3=위험` |
+| 지표 수치 | `GET /api/metric/server-01/cpu` | `levelCode` | number | `2` | `0=전원없음`, `1=클린`, `2=경고`, `3=위험` |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `count` | number | `2` | 알림 개수 |
-| 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].message` | string | `CPU 사용률 83.2% 보통` | 알림 문구 표시 |
+| 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].message` | string | `CPU 사용률 83.2% 경고` | 알림 문구 표시 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].metric` | string | `cpu` | 어떤 지표인지 구분 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].value` | number | `83.2` | 알림 수치 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].levelCode` | number | `1` | 알림 심각도 조건 |
+| 알림 이력 | `GET /api/alerts?limit=5&server=server-01` | `message` | string | `[15:16:35] CPU 사용률 경고 (83.2%)` | 서버별 화면에 표시할 한 줄 문구 |
 
 Make&View에서 자주 쓰는 조건 예시는 다음과 같습니다.
 
@@ -297,7 +298,7 @@ Make&View에서 자주 쓰는 조건 예시는 다음과 같습니다.
 | 로그인 성공 시 다음 화면 이동 | `/auth/current-once?token={token}` | `value` | `{값} > 0` |
 | 로그아웃 처리 완료 확인 | `/auth/logout?token={token}` | `value` | `{값} > 0` |
 | 서버 전원 ON 표시 | `/api/server/server-01` | `powercode` | `{값} == 1` |
-| 서버 전원 OFF 표시 | `/api/server/server-01` | `powercode` | `{값} == 0` |
+| 서버 전원없음 표시 | `/api/server/server-01` | `powercode` | `{값} == 0` |
 | 알림 있음 표시 | `/api/server/server-01` | `alertNum` | `{값} > 0` |
 | 장비 운영상태 경고 이상 표시 | `/api/server/server-01` | `operationCode` | `{값} >= 2` |
 | 장비 운영상태 위험 표시 | `/api/server/server-01` | `operationCode` | `{값} >= 3` |
@@ -386,7 +387,7 @@ Make&View 로그아웃 버튼에서 보낼 파라미터는 다음처럼 잡습�
 ```json
 {
   "powercode": 0,
-  "display": "전원 OFF",
+  "display": "전원없음",
   "levelCode": 0
 }
 ```
@@ -403,7 +404,7 @@ Make&View 로그아웃 버튼에서 보낼 파라미터는 다음처럼 잡습�
 | 서버 상세 | `GET /api/server/server-01/metrics` | `powercode`, `operationCode`, `checkMessage`, `alertNum`, `updatedAt`, `metrics` | 서버 상세 카드 데이터 |
 | 서버별 그래프 | `GET /api/history/server-01/cpu?minutes=60&step=15` | `points` | `[unix초, 값]` 배열 |
 | 전체 그래프 | `GET /api/history/cpu?minutes=60&step=15` | `series[].server`, `series[].points` | 서버별 멀티라인 그래프 |
-| 이상징후 이력 | `GET /api/anomalies?limit=100` | `id`, `server`, `metric`, `value`, `level`, `createdAt` | 보통/위험 기록 |
+| 이상징후 이력 | `GET /api/anomalies?limit=100` | `id`, `server`, `metric`, `value`, `level`, `createdAt` | 경고/위험 기록 |
 | 알림 이력 | `GET /api/alerts?limit=50` | `id`, `server`, `metric`, `level`, `prevLevel`, `message`, `createdAt` | 레벨 전환 기록 |
 
 ## 실행
