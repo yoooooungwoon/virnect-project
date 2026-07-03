@@ -44,4 +44,39 @@ public sealed record AlertRow(
         "warning" => 1,
         _ => 0,
     };
+
+    /// <summary>(색이모지) [HH:mm:ss] (지표아이콘) 서버 · 지표명 상태 (값) 형식 한 줄 표시.</summary>
+    public string Display
+    {
+        get
+        {
+            var color = Level switch
+            {
+                "danger"  => "🔴",
+                "warning" => "🟡",
+                _         => "🟢",
+            };
+            var icon = Metric switch
+            {
+                "cpu"                    => "⚙️",
+                "memory"                 => "💾",
+                "disk" or "disk_io"      => "💿",
+                "net_recv" or "net_sent" => "🌐",
+                _                        => "📊",
+            };
+            var status = Level switch
+            {
+                "danger"  => "위험",
+                "warning" => "경고",
+                _         => "정상 복구",
+            };
+            var time = DateTimeOffset.FromUnixTimeSeconds(CreatedAt)
+                .ToOffset(TimeSpan.FromHours(9))
+                .ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+            var valueStr = Metrics.ById.TryGetValue(Metric, out var spec)
+                ? Metrics.Human(spec, Value)
+                : Value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+            return $"{color} [{time}] {icon} {Server} · {MetricName} {status} ({valueStr})";
+        }
+    }
 }
