@@ -75,7 +75,7 @@ public static class Metrics
         };
         var time = DateTimeOffset.FromUnixTimeSeconds(createdAt)
             .ToOffset(TimeSpan.FromHours(9))
-            .ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
         var valueStr = ById.TryGetValue(metric, out var spec)
             ? Human(spec, value)
             : value.ToString("F2", CultureInfo.InvariantCulture);

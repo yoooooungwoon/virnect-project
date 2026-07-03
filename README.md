@@ -289,7 +289,7 @@ Make&View에서는 아래 표의 `JSON 필드`를 요청 body 또는 응답 필�
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].metric` | string | `cpu` | 어떤 지표인지 구분 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].value` | number | `83.2` | 알림 수치 |
 | 알림 목록 | `GET /api/alert/server-01/issues` | `alerts[0].levelCode` | number | `1` | 알림 심각도 조건 |
-| 알림 이력 | `GET /api/alerts?limit=5&server=server-01` | `message` | string | `[15:16:35] CPU 사용률 경고 (83.2%)` | 서버별 화면에 표시할 한 줄 문구 |
+| 알림 이력 | `GET /api/alerts?limit=5&server=server-01` | `message` | string | `[2026-07-03 15:16:35] CPU 사용률 경고 (83.2%)` | 서버별 화면에 표시할 한 줄 문구 |
 
 Make&View에서 자주 쓰는 조건 예시는 다음과 같습니다.
 
